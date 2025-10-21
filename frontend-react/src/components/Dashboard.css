@@ -1,0 +1,162 @@
+/* Contenedor principal */
+.dashboard-container {
+  min-height: 100vh;
+  background-color: #2563eb;
+  font-family: sans-serif;
+  padding: 40px 20px;
+  text-align: left;
+  color: #111827; /* Texto negro */
+}
+
+/* Logo */
+.dashboard-logo {
+  width: 120px;
+  margin-bottom: 20px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Título */
+.dashboard-container h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #ffffff; /* Solo el título en blanco */
+  text-align: center;
+}
+
+/* Buscador */
+.dashboard-search {
+  width: 100%;
+  max-width: 500px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #ffffff;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 20px;
+}
+
+/* Filtros */
+.dashboard-filters {
+  display: flex;
+  justify-content: flex-start;
+  gap: 15px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.dashboard-filters select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #ffffff;
+  color: #111827;
+  font-size: 1rem;
+}
+
+/* Tarjeta de ticket */
+.dashboard-ticket {
+  background-color: #ffffff;
+  color: #111827;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 25px;
+  text-align: left;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Fondo especial para tickets nuevos */
+.dashboard-ticket.highlight {
+  background-color: #fff8dc;
+}
+
+/* Encabezado del ticket */
+.dashboard-ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-ticket-header button {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.dashboard-ticket-header button:hover {
+  background-color: #1e40af;
+}
+
+/* Estado visual */
+.dashboard-status {
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 5px;
+  color: #ffffff;
+}
+
+.dashboard-status.pendiente {
+  background-color: #d9534f;
+}
+
+.dashboard-status.en_proceso {
+  background-color: #f0ad4e;
+}
+
+.dashboard-status.resuelto {
+  background-color: #5cb85c;
+}
+
+/* Comentario nuevo */
+.dashboard-new-comment {
+  color: #d9534f;
+  font-weight: bold;
+}
+
+/* Historial */
+.dashboard-history img {
+  margin-top: 5px;
+  border: 1px solid #ccc;
+}
+
+/* Sección de actualización */
+.dashboard-update {
+  margin-top: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.dashboard-update select,
+.dashboard-update input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+  background-color: #ffffff;
+  color: #111827;
+}
+
+.dashboard-update button {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.dashboard-update button:hover {
+  background-color: #1e40af;
+}

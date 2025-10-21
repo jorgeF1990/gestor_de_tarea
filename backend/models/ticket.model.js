@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+const historialSchema = new mongoose.Schema({
+  fecha: { type: Date, default: Date.now },
+  estado: String,
+  comentario: String,
+  autor: String,
+  imagen: String
+ 
+});
+
 const ticketSchema = new mongoose.Schema({
   usuario_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -11,15 +20,16 @@ const ticketSchema = new mongoose.Schema({
   numero_ticket: { type: String, unique: true },
   prioridad: { type: String, enum: ['baja', 'media', 'alta'], default: 'media' },
   estado: { type: String, enum: ['pendiente', 'en_proceso', 'resuelto'], default: 'pendiente' },
-  historial: [
-    {
-      fecha: Date,
-      estado: String,
-      comentario: String
-    }
-  ],
+  historial: [historialSchema],
+  
   fecha_creacion: { type: Date, default: Date.now },
-  imagen: String
+  imagen: String,
+  leidoPor: [
+    {
+      usuario: String,
+      fecha: { type: Date, default: Date.now }
+    }
+  ]
 });
 
 module.exports = mongoose.model('Ticket', ticketSchema);

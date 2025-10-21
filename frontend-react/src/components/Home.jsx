@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import './Home.css';
 
 function Home() {
   const [asunto, setAsunto] = useState('');
@@ -29,13 +30,13 @@ function Home() {
           'Content-Type': 'multipart/form-data'
         }
       });
-      setMensaje('✅ Ticket creado correctamente');
+      setMensaje('✅ New Ticket Created Successfully');
       setAsunto('');
       setDescripcion('');
       setImagen(null);
       setPreview(null); 
     } catch {
-      setMensaje('❌ Error al crear el ticket');
+      setMensaje(' Error creating the ticket!');
     }
   };
 
@@ -44,43 +45,42 @@ function Home() {
       setImagen(file);
       const reader = new FileReader();
       reader.onloadend = () => setPreview(reader.result); 
+      reader.readAsDataURL(file);
     }
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div className="home-container">
+      <img src="/logo.png" alt="Logo" className="home-logo" />
+      <h1 className="text-2xl font-bold text-black">Portfolio Investment</h1>
+
       <h2>🎫 Bienvenido al sistema de tickets</h2>
       <p>Gestioná tus solicitudes de soporte de forma rápida, segura y personalizada.</p>
 
       {!user ? (
-        <div style={{ marginTop: '20px', background: '#f9f9f9', padding: '15px', border: '1px solid #ccc' }}>
+        <div className="home-alert">
           <p>🔒 Para crear un ticket necesitás estar logueado.</p>
-          <Link to="/login">
-            <button style={{ marginRight: '10px' }}>Iniciar sesión</button>
-          </Link>
-          <Link to="/register">
-            <button>Registrarse</button>
-          </Link>
+          <Link to="/login"><button className="home-btn">Login</button></Link>
+          <Link to="/register"><button className="home-btn">Register</button></Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{ marginTop: '20px' }}>
+        <form onSubmit={handleSubmit} className="home-form">
           <input
             type="text"
             value={asunto}
             onChange={e => setAsunto(e.target.value)}
             placeholder="📝 Asunto"
             required
-            style={{ display: 'block', marginBottom: '10px', width: '100%' }}
           />
           <textarea
             value={descripcion}
             onChange={e => setDescripcion(e.target.value)}
             placeholder="📄 Descripción"
             required
-            style={{ display: 'block', marginBottom: '10px', width: '100%', height: '100px' }}
           />
 
           <div
+            className="dropzone"
             onDragOver={e => e.preventDefault()}
             onDrop={e => {
               e.preventDefault();
@@ -94,36 +94,25 @@ function Home() {
                 handleImage(blob);
               }
             }}
-            style={{
-              border: '2px dashed #ccc',
-              padding: '2px',
-              marginBottom: '11px',
-              textAlign: 'center',
-              backgroundColor: '#fafafa',
-              cursor: 'pointer'
-            }}
           >
             <input
               type="file"
               onChange={e => handleImage(e.target.files[0])}
               accept="image/*"
-              style={{ display: 'block', margin: '10px auto' }}
             />
-            {imagen && <p>✅ Imagen seleccionada: {imagen.name}</p>}
-            {preview && (
-              <img
-                src={preview}
-                alt="Vista previa"
-                style={{ maxWidth: '100%', maxHeight: '200px', marginTop: '10px' }}
-              />
-            )}
+            {imagen && <p>✅ Selected Image: {imagen.name}</p>}
+            {preview && <img src={preview} alt="Preview" />}
           </div>
 
-          <button type="submit">📤 Crear Ticket</button>
+          <button type="submit" className="home-btn">📤 Create Ticket</button>
         </form>
       )}
 
-      {mensaje && <p style={{ marginTop: '15px' }}>{mensaje}</p>}
+      {mensaje && (
+        <p className={mensaje.includes('✅') ? 'success-message' : 'error-message'}>
+          {mensaje}
+        </p>
+      )}
     </div>
   );
 }

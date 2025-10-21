@@ -1,0 +1,163 @@
+.tickets-container {
+  min-height: 100vh;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-family: sans-serif;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.tickets-container h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Notificación */
+.ticket-alert {
+  background-color: #1e40af;
+  border: 1px solid #ffffff;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+/* Filtros */
+.ticket-filters {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.ticket-filters select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ffffff;
+  background-color: #1e3a8a;
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+/* Lista de tickets */
+.ticket-item {
+  background-color: #ffffff;
+  color: #1e3a8a;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: left;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+}
+
+.ticket-item:hover {
+  transform: scale(1.01);
+}
+
+/* Encabezado del ticket */
+.ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ticket-header button {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ticket-header button:hover {
+  background-color: #1e40af;
+}
+
+/* Estados */
+.ticket-status {
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.status-pendiente {
+  background-color: #facc15;
+  color: #1e3a8a;
+}
+
+.status-en_proceso {
+  background-color: #38bdf8;
+  color: #1e3a8a;
+}
+
+.status-resuelto {
+  background-color: #22c55e;
+  color: #1e3a8a;
+}
+
+/* Comentario nuevo */
+.ticket-nuevo-comentario {
+  background-color: #f87171;
+  color: #ffffff;
+  padding: 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+/* Seguimiento */
+.ticket-followup {
+  margin-top: 20px;
+}
+
+.ticket-followup ul {
+  padding-left: 20px;
+}
+
+.ticket-followup li {
+  margin-bottom: 10px;
+}
+
+.ticket-followup li.highlight {
+  background-color: #e0f2fe;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+/* Comentario */
+.ticket-comment {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ticket-comment input[type="text"],
+.ticket-comment input[type="file"] {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.ticket-comment button {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.ticket-comment button:hover {
+  background-color: #1e40af;
+}

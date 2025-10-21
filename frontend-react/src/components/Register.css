@@ -1,0 +1,75 @@
+.register-container {
+  min-height: 100vh;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+/* Logo */
+.register-logo {
+  width: 120px;
+  margin-bottom: 20px;
+}
+
+/* Título y subtítulo */
+.register-container h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.register-container p {
+  font-size: 1.1rem;
+  line-height: 1.3;
+  color: #f3f4f6;
+  max-width: 500px;
+  margin-bottom: 20px;
+}
+
+/* Formulario */
+.register-form {
+  width: 100%;
+  max-width: 400px;
+  background-color: #1e40af;
+  padding: 30px;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  text-align: left;
+}
+
+.register-form input {
+  width: 100%;
+  border: 1px solid #ffffff;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 15px;
+  font-size: 1rem;
+  background-color: #1e3a8a;
+  color: #ffffff;
+}
+
+.register-form input:focus {
+  outline: none;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
+}
+
+/* Botón centrado */
+.register-btn-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+/* Error */
+.register-error {
+  margin-top: 15px;
+  color: #ef4444;
+  font-weight: 600;
+}

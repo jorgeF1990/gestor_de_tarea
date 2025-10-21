@@ -1,0 +1,40 @@
+.navbar {
+  background-color: #1e3a8a; /* Azul oscuro */
+  color: #ffffff;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.navbar a {
+  color: #ffffff;
+  text-decoration: none;
+  margin: 0 8px;
+  font-weight: 500;
+  transition: color 0.2s ease-in-out;
+}
+
+.navbar a:hover {
+  color: #93c5fd; /* Azul claro al pasar el mouse */
+}
+
+.navbar span {
+  margin-right: 12px;
+  font-weight: 500;
+}
+
+.navbar button {
+  background-color: #2563eb; /* Azul medio */
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.navbar button:hover {
+  background-color: #1d4ed8; /* Azul más oscuro */
+}

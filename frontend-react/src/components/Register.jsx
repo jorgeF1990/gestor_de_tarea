@@ -9,6 +9,7 @@ function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const version = import.meta.env.VITE_VERSION;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,6 +59,7 @@ function Register() {
       </form>
 
       {error && <p className="register-error">{error}</p>}
+      <p className="app-version">Versión: {version}</p>
     </div>
   );
 }

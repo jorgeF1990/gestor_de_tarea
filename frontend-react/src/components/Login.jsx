@@ -10,6 +10,8 @@ function Login() {
   const [error, setError] = useState('');
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const version = import.meta.env.VITE_VERSION;
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,6 +54,8 @@ function Login() {
       </form>
 
       {error && <p className="login-error">{error}</p>}
+      <p className="app-version">Versión: {version}</p>
+
     </div>
   );
 }

@@ -12,6 +12,8 @@ function Home() {
   const [mensaje, setMensaje] = useState('');
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const version = import.meta.env.VITE_VERSION;
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,6 +115,8 @@ function Home() {
           {mensaje}
         </p>
       )}
+      <p className="app-version">Versión: {version}</p>
+
     </div>
   );
 }

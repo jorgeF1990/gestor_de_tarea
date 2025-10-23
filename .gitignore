@@ -3,3 +3,4 @@ backend/uploads/
 .env
 backend/.env
 frontend-react/.env
+backend/.env

@@ -16,9 +16,9 @@ function Tickets() {
   const navigate = useNavigate();
 
   useEffect(() => {
-  const t = setTimeout(() => setFiltroBusqueda(busquedaTexto.trim()), 350);
-  return () => clearTimeout(t);
-}, [busquedaTexto]);
+    const t = setTimeout(() => setFiltroBusqueda(busquedaTexto.trim()), 350);
+    return () => clearTimeout(t);
+  }, [busquedaTexto]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -124,17 +124,33 @@ function Tickets() {
 
   // NUEVO: filtrado memoizado usando filtroBusqueda (debounced)
   const ticketsFiltrados = useMemo(() => {
-    if (!filtroBusqueda) return tickets;
+    if (!tickets.length) return [];
+
+    const ahora = new Date();
     const q = filtroBusqueda.toLowerCase();
+
     return tickets.filter(t => {
+      // Excluir tickets cerrados hace más de 30 días
+      if (t.estado === 'cerrado') {
+        const fechaReferencia = new Date(t.fecha_cierre || t.fecha_actualizacion || t.fecha_creacion);
+        const diasPasados = (ahora - fechaReferencia) / (1000 * 60 * 60 * 24);
+        if (diasPasados > 30) return false;
+      }
+
+      // Filtro de búsqueda textual
+      if (!filtroBusqueda) return true;
+
       const numero = String(t.numero_ticket || '');
       const asunto = String(t.asunto || '').toLowerCase();
       const descripcion = String(t.descripcion || '').toLowerCase();
+      const estado = String(t.estado || '').toLowerCase();
       const email = String(t.usuario_id?.email || '').toLowerCase();
+
       return (
         numero.includes(q) ||
         asunto.includes(q) ||
         descripcion.includes(q) ||
+        estado.includes(q) ||
         email.includes(q)
       );
     });
@@ -157,9 +173,13 @@ function Tickets() {
       <div className="ticket-filters">
         <select onChange={e => setEstadoFiltro(e.target.value)} value={estadoFiltro}>
           <option value="">Todos los estados</option>
+          <option value="abierto">Abierto</option>
           <option value="pendiente">Pendiente</option>
           <option value="en_proceso">En proceso</option>
           <option value="resuelto">Resuelto</option>
+          <option value="cerrado">Cerrado</option>
+          <option value="reabierto">Reabierto</option>
+          <option value="cancelado">Cancelado</option>
         </select>
         <select onChange={e => setPrioridadFiltro(e.target.value)} value={prioridadFiltro}>
           <option value="">Todas las prioridades</option>

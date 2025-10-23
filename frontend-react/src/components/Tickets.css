@@ -97,19 +97,34 @@
   border-radius: 4px;
   text-transform: capitalize;
 }
-
+.status-abierto {
+  background-color: #28a744;
+  color: #1e3a8a;
+}
 .status-pendiente {
-  background-color: #facc15;
+  background-color: #ffc107;
   color: #1e3a8a;
 }
 
 .status-en_proceso {
-  background-color: #38bdf8;
+  background-color: #17a2b8;
   color: #1e3a8a;
 }
 
 .status-resuelto {
-  background-color: #22c55e;
+  background-color: #6f42c1;
+  color: #1e3a8a;
+}
+.status-cerrado {
+  background-color: #6c757d;
+  color: #1e3a8a;
+}
+.status-reabierto {
+  background-color: #fd7e14;
+  color: #1e3a8a;
+}
+.status-cancelado {
+  background-color: #dc3545;
   color: #1e3a8a;
 }
 

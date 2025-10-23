@@ -178,10 +178,14 @@ function Dashboard() {
   };
 
   const colorEstado = {
-    pendiente: '#d9534f',
-    en_proceso: '#f0ad4e',
-    resuelto: '#5cb85c'
-  };
+  abierto: '#28a744',       
+  pendiente: '#ffc107',     
+  en_proceso: '#17a2b8',    
+  resuelto: '#6f42c1',      
+  cerrado: '#6c757d',       
+  reabierto: '#fd7e14',     
+  cancelado: '#dc3545'      
+};
 
   // handler para cambiar inputs de “cambios” por ticket
   const onCambio = (id, campo, valor) => {
@@ -211,9 +215,13 @@ function Dashboard() {
       <div className="dashboard-filters">
         <select onChange={e => setEstadoFiltro(e.target.value)} value={estadoFiltro}>
           <option value="">Todos los estados</option>
+          <option value="abierto">Abierto</option>
           <option value="pendiente">Pendiente</option>
           <option value="en_proceso">En proceso</option>
           <option value="resuelto">Resuelto</option>
+          <option value="cerrado">Cerrado</option>
+          <option value="reabierto">Reabierto</option>
+          <option value="cancelado">Cancelado</option>
         </select>
         <select
           onChange={e => setPrioridadFiltro(e.target.value)}
@@ -348,9 +356,13 @@ function Dashboard() {
                       onChange={e => onCambio(ticket._id, 'nuevoEstado', e.target.value)}
                     >
                       <option value="" disabled>Nuevo estado</option>
+                      <option value="abierto">Abierto</option>
                       <option value="pendiente">Pendiente</option>
                       <option value="en_proceso">En proceso</option>
                       <option value="resuelto">Resuelto</option>
+                      <option value="cerrado">Cerrado</option>
+                      <option value="reabierto">Reabierto</option>
+                      <option value="cancelado">Cancelado</option>
                     </select>
 
                     <select

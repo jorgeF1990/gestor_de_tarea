@@ -19,7 +19,7 @@ const ticketSchema = new mongoose.Schema({
   descripcion: String,
   numero_ticket: { type: String, unique: true },
   prioridad: { type: String, enum: ['baja', 'media', 'alta'], default: 'media' },
-  estado: { type: String, enum: ['pendiente', 'en_proceso', 'resuelto'], default: 'pendiente' },
+  estado: { type: String, enum: ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado'], default: 'pendiente' },
   historial: [historialSchema],
 
   fecha_creacion: { type: Date, default: Date.now },

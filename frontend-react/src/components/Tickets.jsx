@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './Tickets.css';
@@ -11,7 +11,14 @@ function Tickets() {
   const [comentarios, setComentarios] = useState({});
   const [usuarioActual, setUsuarioActual] = useState('');
   const [abiertos, setAbiertos] = useState({});
+  const [busquedaTexto, setBusquedaTexto] = useState('');
+  const [filtroBusqueda, setFiltroBusqueda] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+  const t = setTimeout(() => setFiltroBusqueda(busquedaTexto.trim()), 350);
+  return () => clearTimeout(t);
+}, [busquedaTexto]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -115,12 +122,38 @@ function Tickets() {
     return () => clearInterval(interval);
   }, []);
 
+  // NUEVO: filtrado memoizado usando filtroBusqueda (debounced)
+  const ticketsFiltrados = useMemo(() => {
+    if (!filtroBusqueda) return tickets;
+    const q = filtroBusqueda.toLowerCase();
+    return tickets.filter(t => {
+      const numero = String(t.numero_ticket || '');
+      const asunto = String(t.asunto || '').toLowerCase();
+      const descripcion = String(t.descripcion || '').toLowerCase();
+      const email = String(t.usuario_id?.email || '').toLowerCase();
+      return (
+        numero.includes(q) ||
+        asunto.includes(q) ||
+        descripcion.includes(q) ||
+        email.includes(q)
+      );
+    });
+  }, [tickets, filtroBusqueda]);
+
   return (
     <div className="tickets-container">
       <img src="/logo.png" alt="Logo" className="tickets-logo" />
       <h1 className="text-2xl font-bold text-black">Portfolio Investment</h1>
       <h2>Mis Tickets</h2>
       <p>Gestioná y realizá seguimiento de tus solicitudes de soporte.</p>
+      <input
+        type="text"
+        className="ticket-search"
+        placeholder="Buscar por ticket, asunto, descripción o usuario"
+        value={busquedaTexto}
+        onChange={e => setBusquedaTexto(e.target.value)}
+      />
+
       <div className="ticket-filters">
         <select onChange={e => setEstadoFiltro(e.target.value)} value={estadoFiltro}>
           <option value="">Todos los estados</option>
@@ -136,8 +169,8 @@ function Tickets() {
         </select>
       </div>
       <ul>
-        {Array.isArray(tickets) && tickets.length > 0 ? (
-          tickets.map(ticket => {
+        {Array.isArray(ticketsFiltrados) && ticketsFiltrados.length > 0 ? (
+          ticketsFiltrados.map(ticket => {
             const abierto = abiertos[ticket._id];
             const comentarioNuevo = tieneComentarioNuevoDeOtro(ticket);
             return (

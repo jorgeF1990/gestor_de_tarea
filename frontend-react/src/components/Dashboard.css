@@ -5,7 +5,8 @@
   font-family: sans-serif;
   padding: 40px 20px;
   text-align: left;
-  color: #111827; /* Texto negro */
+  color: #111827;
+  /* Texto negro */
 }
 
 /* Logo */
@@ -22,7 +23,8 @@
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 20px;
-  color: #ffffff; /* Solo el título en blanco */
+  color: #ffffff;
+  /* Solo el título en blanco */
   text-align: center;
 }
 
@@ -65,7 +67,7 @@
   padding: 20px;
   margin-bottom: 25px;
   text-align: left;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 /* Fondo especial para tickets nuevos */

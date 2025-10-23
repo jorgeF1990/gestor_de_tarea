@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import {jwtDecode} from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -58,53 +58,53 @@ function Dashboard() {
   };
 
   const actualizarTicket = async (id) => {
-  const token = localStorage.getItem('token');
-  const cambio = cambios[id] || {};
-  const { nuevoEstado, nuevaPrioridad } = cambio;
+    const token = localStorage.getItem('token');
+    const cambio = cambios[id] || {};
+    const { nuevoEstado, nuevaPrioridad } = cambio;
 
-  console.log('Actualizar ticket', id, 'con', nuevoEstado, nuevaPrioridad);
+    console.log('Actualizar ticket', id, 'con', nuevoEstado, nuevaPrioridad);
 
-  if (!nuevoEstado && !nuevaPrioridad) {
-    setMensajes(prev => ({ ...prev, [id]: '⚠️ No hay cambios de estado o prioridad' }));
-    return;
-  }
+    if (!nuevoEstado && !nuevaPrioridad) {
+      setMensajes(prev => ({ ...prev, [id]: '⚠️ No hay cambios de estado o prioridad' }));
+      return;
+    }
 
-  // Construir payload solo con campos presentes (evita enviar "" o undefined)
-  const payload = {};
-  if (nuevoEstado) payload.estado = nuevoEstado;
-  if (nuevaPrioridad) payload.prioridad = nuevaPrioridad;
+    // Construir payload solo con campos presentes (evita enviar "" o undefined)
+    const payload = {};
+    if (nuevoEstado) payload.estado = nuevoEstado;
+    if (nuevaPrioridad) payload.prioridad = nuevaPrioridad;
 
-  try {
-    // Intentar enviar JSON (Content-Type: application/json)
-    await axios.put(
-      `${import.meta.env.VITE_BACKEND_URL}/tickets/${id}/estado`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    try {
+      // Intentar enviar JSON (Content-Type: application/json)
+      await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/tickets/${id}/estado`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
 
-    // Actualización optimista del estado local (si tienes un estado 'tickets')
-    setTickets(prev => prev.map(t => t._id === id ? { ...t, ...payload } : t));
+      // Actualización optimista del estado local (si tienes un estado 'tickets')
+      setTickets(prev => prev.map(t => t._id === id ? { ...t, ...payload } : t));
 
-    // limpiar los campos de cambios para ese ticket
-    setCambios(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+      // limpiar los campos de cambios para ese ticket
+      setCambios(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
 
-    setMensajes(prev => ({ ...prev, [id]: '✅ Estado/prioridad actualizado correctamente' }));
-    // Opcional: recargar listados si necesitas datos frescos desde backend
-    await cargarTickets();
-  } catch (err) {
-    const mensajeError = err.response?.data?.message || '❌ Error al actualizar estado/prioridad';
-    setMensajes(prev => ({ ...prev, [id]: mensajeError }));
-  }
-};
+      setMensajes(prev => ({ ...prev, [id]: '✅ Estado/prioridad actualizado correctamente' }));
+      // Opcional: recargar listados si necesitas datos frescos desde backend
+      await cargarTickets();
+    } catch (err) {
+      const mensajeError = err.response?.data?.message || '❌ Error al actualizar estado/prioridad';
+      setMensajes(prev => ({ ...prev, [id]: mensajeError }));
+    }
+  };
 
   const agregarComentarioDesdeDashboard = async (id) => {
     const token = localStorage.getItem('token');
@@ -197,7 +197,7 @@ function Dashboard() {
   return (
     <div className="dashboard-container">
       <img src="/logo.png" alt="Logo" className="dashboard-logo" />
-      
+
       <h2>Panel principal (Admin)</h2>
 
       <input
@@ -295,12 +295,25 @@ function Dashboard() {
                   {esNuevo && <p style={{ color: 'red' }}>🆕 Ticket nuevo sin procesar</p>}
 
                   {ticket.imagen && (
-                    <img
-                      src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${ticket.imagen}`}
-                      alt="Adjunto"
-                      width="200"
-                      style={{ marginBottom: '10px' }}
-                    />
+                    <div>
+                      <p><strong>Imagen adjunta:</strong></p>
+                      <a
+                        href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${ticket.imagen}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <img
+                          src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${ticket.imagen}`}
+                          alt="Adjunto"
+                          width="200"
+                          style={{ border: '1px solid #ccc', marginTop: '10px' }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/200?text=Imagen+no+disponible';
+                          }}
+                        />
+                      </a>
+                    </div>
                   )}
 
                   {ticket.historial?.length > 0 && (

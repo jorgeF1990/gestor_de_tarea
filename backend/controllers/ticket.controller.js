@@ -1,27 +1,12 @@
 const Ticket = require('../models/ticket.model');
 const User = require('../models/User');
-const nodemailer = require('nodemailer');
+const { enviarCorreoTicket } = require('../utils/mailer');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_FROM,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-async function enviarNotificacion(email, asunto, mensaje) {
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: email,
-      subject: asunto,
-      text: mensaje
-    });
-  } catch (err) {
-    console.error('Error al enviar correo:', err.message);
-  }
-}
+const resolveAppUrlFromReq = (req) => {
+  const envUrl = process.env.APP_URL && process.env.APP_URL !== 'http://localhost:3000' ? process.env.APP_URL : null;
+  const reqUrl = `${req.protocol}://${req.get('host')}`; // ej. http://localhost:5001
+  return (envUrl || reqUrl).replace(/\/$/, '');
+};
 
 exports.crearTicket = async (req, res) => {
   try {
@@ -47,13 +32,20 @@ exports.crearTicket = async (req, res) => {
     });
 
     await ticket.save();
+    await ticket.populate('usuario_id', 'email');
 
-    const usuario = await User.findById(req.user.id);
-    await enviarNotificacion(
-      usuario.email,
-      'Ticket generado',
-      `Tu ticket fue creado con número: ${ticket.numero_ticket}\nEstado: ${ticket.estado}`
-    );
+    // Propiedades auxiliares para el correo
+    ticket.fecha = new Date(ticket.createdAt).toLocaleDateString('es-AR');
+    ticket.hora_creacion = new Date(ticket.createdAt).toLocaleTimeString('es-AR');
+    ticket.ultimo_autor = ticket.usuario_id?.email || req.user.email;
+
+    // Asegurar APP_URL correcto (backend) para que el mailer genere URLs accesibles
+    ticket.APP_URL = resolveAppUrlFromReq(req);
+
+    const imagenPath = imagen ? `uploads/${imagen}` : null;
+    const destinatarios = [ticket.usuario_id.email, 'envios@portfolioinvestment.com.ar'];
+
+    await enviarCorreoTicket(ticket, destinatarios, imagenPath, 'crear');
 
     res.status(201).json(ticket);
   } catch (err) {
@@ -65,7 +57,7 @@ exports.crearTicket = async (req, res) => {
 exports.agregarComentario = async (req, res) => {
   try {
     const { comentario } = req.body;
-    const imagen = req.file?.filename || null; 
+    const imagen = req.file?.filename || null;
 
     if (!comentario && !imagen) {
       return res.status(400).json({ mensaje: 'Comentario o imagen requerido' });
@@ -74,6 +66,7 @@ exports.agregarComentario = async (req, res) => {
     const ticket = await Ticket.findById(req.params.id).populate('usuario_id', 'email');
     if (!ticket) return res.status(404).json({ mensaje: 'Ticket no encontrado' });
 
+    // Agregar comentario al historial
     ticket.historial.push({
       fecha: new Date(),
       estado: ticket.estado,
@@ -82,24 +75,31 @@ exports.agregarComentario = async (req, res) => {
       imagen
     });
 
-    ticket.leidoPor = ticket.leidoPor.filter(l => l.usuario === req.user.email);
+    // Marcar como no leído para los demás
+    if (Array.isArray(ticket.leidoPor)) {
+      ticket.leidoPor = ticket.leidoPor.filter(l => l.usuario !== req.user.email);
+    }
 
     await ticket.save();
+    await ticket.populate('usuario_id', 'email');
 
-    let destinatario;
-    if (req.user.id.toString() === ticket.usuario_id._id.toString()) {
-      destinatario = process.env.SOPORTE_EMAIL;
-    } else {
-      destinatario = ticket.usuario_id.email;
-    }
+    // Propiedades auxiliares para el correo
+    ticket.fecha = new Date().toLocaleDateString('es-AR');
+    ticket.hora_creacion = new Date().toLocaleTimeString('es-AR');
+    ticket.ultimo_autor = req.user.email;
 
-    if (destinatario) {
-      await enviarNotificacion(
-        destinatario,
-        'Nuevo comentario en ticket',
-        `El ticket #${ticket.numero_ticket} tiene un nuevo comentario de ${req.user.email}: ${comentario || 'Imagen adjunta'}`
-      );
-    }
+    // Asegurar APP_URL correcto
+    ticket.APP_URL = resolveAppUrlFromReq(req);
+
+    const imagenPath = imagen ? `uploads/${imagen}` : null;
+    const destinatarios = [
+      ticket.usuario_id.email,
+      req.user.id.toString() === ticket.usuario_id._id.toString()
+        ? 'envios@portfolioinvestment.com.ar'
+        : req.user.email
+    ];
+
+    await enviarCorreoTicket(ticket, destinatarios, imagenPath, 'comentario');
 
     res.json(ticket);
   } catch (err) {
@@ -111,35 +111,84 @@ exports.agregarComentario = async (req, res) => {
 exports.actualizarEstado = async (req, res) => {
   try {
     const { estado, prioridad, comentario } = req.body;
-    const ticket = await Ticket.findById(req.params.id).populate('usuario_id', 'email');
+    const { id } = req.params;
+
+    if (!req.user || !req.user.email) {
+      return res.status(401).json({ mensaje: 'Usuario no autenticado' });
+    }
+
+    const ticket = await Ticket.findById(id).populate('usuario_id', 'email');
     if (!ticket) return res.status(404).json({ mensaje: 'Ticket no encontrado' });
 
-    if (estado) ticket.estado = estado;
-    if (prioridad) ticket.prioridad = prioridad;
+    let huboCambio = false;
+    const cambios = [];
+
+    if (estado && estado !== ticket.estado) {
+      const prev = ticket.estado;
+      ticket.estado = estado;
+      huboCambio = true;
+      cambios.push(`Estado: ${prev} → ${estado}`);
+    }
+
+    if (prioridad && prioridad !== ticket.prioridad) {
+      const prev = ticket.prioridad;
+      ticket.prioridad = prioridad;
+      huboCambio = true;
+      cambios.push(`Prioridad: ${prev} → ${prioridad}`);
+    }
 
     if (comentario) {
       ticket.historial.push({
         fecha: new Date(),
-        estado: estado || ticket.estado,
+        estado: ticket.estado,
         comentario,
         autor: req.user.email
       });
-      ticket.leidoPor = ticket.leidoPor.filter(l => l.usuario === req.user.email);
+      huboCambio = true;
     }
 
-    await ticket.save();
+    if (huboCambio && !comentario) {
+      ticket.historial.push({
+        fecha: new Date(),
+        estado: ticket.estado,
+        comentario: cambios.length ? `Actualizaciones: ${cambios.join('; ')}` : 'Actualización de estado/prioridad',
+        autor: req.user.email
+      });
+    }
 
-    const usuario = await User.findById(ticket.usuario_id);
-    await enviarNotificacion(
-      usuario.email,
-      'Actualización de ticket',
-      `Tu ticket con número: ${ticket.numero_ticket} ha sido actualizado.\nNuevo estado: ${ticket.estado}\nNueva prioridad: ${ticket.prioridad}\nComentario: ${comentario || 'Sin comentario'}`
-    );
+    if (!huboCambio) {
+      return res.status(200).json({ mensaje: 'No hubo cambios en estado, prioridad ni comentario', ticket });
+    }
+
+    // Marcar como no leído para los demás
+    if (Array.isArray(ticket.leidoPor)) {
+      ticket.leidoPor = ticket.leidoPor.filter(l => l.usuario !== req.user.email);
+    }
+
+    ticket.actualizador = req.user.email;
+    await ticket.save();
+    await ticket.populate('usuario_id', 'email');
+
+    // Propiedades auxiliares para el correo
+    ticket.fecha = new Date().toLocaleDateString('es-AR');
+    ticket.hora_creacion = new Date().toLocaleTimeString('es-AR');
+    ticket.ultimo_autor = req.user.email;
+
+    // Asegurar APP_URL correcto
+    ticket.APP_URL = resolveAppUrlFromReq(req);
+
+    const destinatarios = [ticket.usuario_id.email, 'envios@portfolioinvestment.com.ar'];
+
+    try {
+      await enviarCorreoTicket(ticket, destinatarios, null, 'estado');
+    } catch (correoError) {
+      console.error('Error al enviar correo de actualización:', correoError.message);
+    }
 
     res.json(ticket);
   } catch (err) {
-    console.error('Error al actualizar ticket:', err.message);
-    res.status(500).json({ error: 'Error al actualizar ticket' });
+    console.error('Error al actualizar ticket:', err);
+    res.status(500).json({ error: 'Error al actualizar ticket', detalle: err.message });
   }
 };
 

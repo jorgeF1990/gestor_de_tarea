@@ -6,7 +6,7 @@ const historialSchema = new mongoose.Schema({
   comentario: String,
   autor: String,
   imagen: String
- 
+
 });
 
 const ticketSchema = new mongoose.Schema({
@@ -21,7 +21,7 @@ const ticketSchema = new mongoose.Schema({
   prioridad: { type: String, enum: ['baja', 'media', 'alta'], default: 'media' },
   estado: { type: String, enum: ['pendiente', 'en_proceso', 'resuelto'], default: 'pendiente' },
   historial: [historialSchema],
-  
+
   fecha_creacion: { type: Date, default: Date.now },
   imagen: String,
   leidoPor: [

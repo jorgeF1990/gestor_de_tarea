@@ -1,10 +1,11 @@
+// src/pages/Login.jsx
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { login as loginAPI } from '../api';
 import { AuthContext } from '../context/AuthContext.jsx';
 import './Login.css';
 
-function Login() {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,15 +13,21 @@ function Login() {
   const navigate = useNavigate();
   const version = import.meta.env.VITE_VERSION;
 
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
-      const res = await loginAPI({ email, password });
-      login(res.data.token);
+      // loginAPI devuelve res.data (por el wrapper handle en src/api.js)
+      const data = await loginAPI({ email, password });
+      // data debe contener { token, usuario }
+      if (!data || !data.token) throw new Error('No se recibió token desde el servidor');
+      // Guardar token en el contexto (AuthContext.login debe manejar almacenamiento)
+      login(data.token);
       navigate('/dashboard');
-    } catch {
-      setError('❌ Invalid Credentials');
+    } catch (err) {
+      console.error('Login error:', err);
+      const msg = err?.message || err?.detalle || (err?.error || 'Credenciales inválidas');
+      setError(msg);
     }
   };
 
@@ -54,10 +61,10 @@ function Login() {
       </form>
 
       {error && <p className="login-error">{error}</p>}
+      <p className="forgot-password">
+        <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
+      </p>
       <p className="app-version">Versión: {version}</p>
-
     </div>
   );
 }
-
-export default Login;

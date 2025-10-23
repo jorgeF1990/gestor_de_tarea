@@ -11,7 +11,7 @@ module.exports = function (req, res, next) {
     req.user = {
       id: decoded.id,
       rol: decoded.rol,
-      email: decoded.email 
+      email: decoded.email
     };
     console.log('Token decodificado:', req.user);
     next();

@@ -1,6 +1,7 @@
 .home-container {
   min-height: 100vh;
-  background-color: #2563eb; /* Azul principal */
+  background-color: #2563eb;
+  /* Azul principal */
   color: #ffffff;
   font-family: sans-serif;
   display: flex;
@@ -92,7 +93,7 @@
 .home-form textarea:focus {
   outline: none;
   border-color: #ffffff;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
 /* Dropzone */

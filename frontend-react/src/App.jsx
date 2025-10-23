@@ -6,6 +6,8 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import Tickets from './components/Tickets';
+import Recuperar from './components/Recuperar';
+import ResetPassword from './components/ResetPassword';
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/tickets" element={<Tickets />} />
+        <Route path="/recuperar" element={<Recuperar />} />
+        <Route path="/reset/:token" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );

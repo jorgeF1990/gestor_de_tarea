@@ -1,0 +1,24 @@
+{
+  "name": "sistema-tickets",
+  "version": "1.0.0",
+  "description": "Sistema de tickets con backend en Node.js y frontend en React",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-react\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jorgeF1990/sistema-tickets.git"
+  },
+  "keywords": ["tickets", "nodejs", "react", "vite", "express"],
+  "author": "Jorge F.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jorgeF1990/sistema-tickets/issues"
+  },
+  "homepage": "https://github.com/jorgeF1990/sistema-tickets#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

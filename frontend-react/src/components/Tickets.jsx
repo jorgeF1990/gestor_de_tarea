@@ -93,7 +93,7 @@ function Tickets() {
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
+            //'Content-Type': 'multipart/form-data'
           }
         }
       );
@@ -157,17 +157,17 @@ function Tickets() {
                     <p>
                       <strong>Estado:</strong>{' '}
                       <span className={`ticket-status status-${ticket.estado}`}>{ticket.estado}</span>{' '}
-                      / <strong>Prioridad:</strong> <em>{ticket.prioridad}</em>  
-                      / <strong>Usuario:</strong> {ticket.usuario_id?.email}</p> 
-                      / <strong>asunto:</strong> {ticket.asunto} 
-                      / <strong>Descripción:</strong> {ticket.descripcion}
+                      / <strong>Prioridad:</strong> <em>{ticket.prioridad}</em>
+                      / <strong>Usuario:</strong> {ticket.usuario_id?.email}</p>
+                    / <strong>asunto:</strong> {ticket.asunto}
+                    / <strong>Descripción:</strong> {ticket.descripcion}
                     <p><strong>Fecha de creación:</strong> {new Date(ticket.fecha_creacion).toLocaleString()}</p>
-                    
+
                   </>
                 )}
 
                 {comentarioNuevo && (
-                  <p className="ticket-nuevo-comentario">🆕 New unread comment</p>
+                  <p className="ticket-nuevo-comentario">New unread comment</p>
                 )}
 
                 {abierto && (
@@ -201,37 +201,47 @@ function Tickets() {
                       </div>
                     )}
 
-                    {ticket.historial && ticket.historial.length > 0 && (
-                    <div className="ticket-followup">
-                      <p><strong>Seguimiento:</strong></p>
-                      <ul>
-                        {ticket.historial.map((h, i) => (
-                          <li
-                            key={i}
-                            className={h.autor && h.autor !== usuarioActual ? 'highlight' : ''}
-                          >
-                            {new Date(h.fecha).toLocaleString()} - <strong>{h.estado}</strong>: {h.comentario} {h.autor && `(${h.autor})`}
-                            {h.imagen && (
-                              <div>
-                                <a
-                                  href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <img
-                                    src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
-                                    alt="Adjunto"
-                                    width="150"
-                                    style={{ marginTop: '5px', border: '1px solid #ccc' }}
-                                  />
-                                </a>
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    {ticket.historial?.length > 0 && (
+                      <div className="ticket-followup">
+                        <p><strong>Seguimiento:</strong></p>
+                        <ul>
+                          {ticket.historial.map((h, i) => (
+                            <li
+                              key={i}
+                              className={h.autor && h.autor !== usuarioActual ? 'highlight' : ''}
+                              style={{ marginBottom: '1rem' }}
+                            >
+                              <p>
+                                <strong>{new Date(h.fecha).toLocaleString()}</strong> — <em>{h.estado}</em><br />
+                                {h.comentario} {h.autor && <span>({h.autor})</span>}
+                              </p>
+
+                              {h.imagen && (
+                                <div>
+                                  <a
+                                    href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <img
+                                      src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
+                                      alt="Adjunto"
+                                      width="200"
+                                      style={{
+                                        marginTop: '8px',
+                                        border: '1px solid #ccc',
+                                        borderRadius: '4px',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                      }}
+                                    />
+                                  </a>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="ticket-btn-wrapper">
                       <input

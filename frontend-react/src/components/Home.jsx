@@ -8,7 +8,7 @@ function Home() {
   const [asunto, setAsunto] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [imagen, setImagen] = useState(null);
-  const [preview, setPreview] = useState(null); 
+  const [preview, setPreview] = useState(null);
   const [mensaje, setMensaje] = useState('');
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ function Home() {
       setAsunto('');
       setDescripcion('');
       setImagen(null);
-      setPreview(null); 
+      setPreview(null);
     } catch {
       setMensaje(' Error creating the ticket!');
     }
@@ -46,7 +46,7 @@ function Home() {
     if (file && file.type.startsWith('image/')) {
       setImagen(file);
       const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result); 
+      reader.onloadend = () => setPreview(reader.result);
       reader.readAsDataURL(file);
     }
   };

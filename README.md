@@ -34,12 +34,19 @@ Crear backend/.env con al menos:
 - APP_URL = URL pública de la app para enlaces en correos
 - SMTP_HOST, SMTP_USER, SMTP_PASS = configuración SMTP para envíos
 Ejemplo mínimo:
+
 PORT=4000
+
 MONGO_URI=mongodb://localhost:27017/sistema-tickets
+
 JWT_SECRET=una_clave_segura
+
 APP_URL=http://localhost:5173
+
 SMTP_HOST=smtp.example.com
+
 SMTP_USER=usuario@example.com
+
 SMTP_PASS=tu_password
 
 

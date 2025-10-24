@@ -17,8 +17,10 @@ function Navbar() {
       <div className="navbar-left">
         <Link to="/">Home</Link>
         {user?.rol === 'admin' && <Link to="/dashboard">Dashboard</Link>}
+        {user?.rol === 'admin' && <Link to="/stats">Estadísticas</Link>}
         <Link to="/tickets">Tickets</Link>
       </div>
+      
 
       <div className="navbar-right">
         {user ? (

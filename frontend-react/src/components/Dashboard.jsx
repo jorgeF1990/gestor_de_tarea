@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
@@ -178,14 +178,38 @@ function Dashboard() {
   };
 
   const colorEstado = {
-  abierto: '#28a744',       
-  pendiente: '#ffc107',     
-  en_proceso: '#17a2b8',    
-  resuelto: '#6f42c1',      
-  cerrado: '#6c757d',       
-  reabierto: '#fd7e14',     
-  cancelado: '#dc3545'      
-};
+    abierto: '#28a744',
+    pendiente: '#ffc107',
+    en_proceso: '#17a2b8',
+    resuelto: '#6f42c1',
+    cerrado: '#6c757d',
+    reabierto: '#fd7e14',
+    cancelado: '#dc3545'
+  };
+
+  // Conteos memoizados por estado
+  const conteos = useMemo(() => {
+    const inicial = {
+      abierto: 0,
+      pendiente: 0,
+      en_proceso: 0,
+      resuelto: 0,
+      cerrado: 0,
+      reabierto: 0,
+      cancelado: 0,
+      total: 0
+    };
+
+    // Conteo flexible: normaliza clave y suma
+    return tickets.reduce((acc, t) => {
+      const est = String(t.estado || '').toLowerCase();
+      if (est && Object.prototype.hasOwnProperty.call(acc, est)) {
+        acc[est] += 1;
+      }
+      acc.total += 1;
+      return acc;
+    }, inicial);
+  }, [tickets]);
 
   // handler para cambiar inputs de “cambios” por ticket
   const onCambio = (id, campo, valor) => {
@@ -200,9 +224,52 @@ function Dashboard() {
 
   return (
     <div className="dashboard-container">
+      <div className="dashboard-resumen">
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.abierto}` }}>
+    <div className="resumen-title">Abiertos</div>
+    <div className="resumen-value">{conteos.abierto}</div>
+  </div>
+
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.pendiente}` }}>
+    <div className="resumen-title">Pendientes</div>
+    <div className="resumen-value">{conteos.pendiente}</div>
+  </div>
+
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.en_proceso}` }}>
+    <div className="resumen-title">En proceso</div>
+    <div className="resumen-value">{conteos.en_proceso}</div>
+  </div>
+
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.resuelto}` }}>
+    <div className="resumen-title">Resueltos</div>
+    <div className="resumen-value">{conteos.resuelto}</div>
+  </div>
+
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.reabierto}` }}>
+    <div className="resumen-title">Reabiertos</div>
+    <div className="resumen-value">{conteos.reabierto}</div>
+  </div>
+
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.cancelado}` }}>
+    <div className="resumen-title">Cancelados</div>
+    <div className="resumen-value">{conteos.cancelado}</div>
+  </div>
+
+  <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.cerrado}` }}>
+    <div className="resumen-title">Cerrados</div>
+    <div className="resumen-value">{conteos.cerrado}</div>
+  </div>
+
+  <div className="resumen-card total">
+    <div className="resumen-title">Total</div>
+    <div className="resumen-value">{conteos.total}</div>
+  </div>
+</div>
       <img src="/logo.png" alt="Logo" className="dashboard-logo" />
 
       <h2>Panel principal (Admin)</h2>
+
+
 
       <input
         type="text"

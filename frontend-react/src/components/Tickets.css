@@ -1,5 +1,5 @@
 :root{
-  --brand:#2563eb; --brand-dark:#1e40af;
+  --brand:#0b5cff; --brand-dark:#0846bf;
   --ink:#0f172a; --muted:#64748b;
   --panel:#ffffff; --panel-weak:#f8fafc;
   --border: rgba(2,6,23,.08);
@@ -12,7 +12,9 @@
   background: var(--brand);
   padding: 36px 16px 60px;
   color: var(--ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Inter, Roboto, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, "Helvetica Neue", Arial, Roboto, sans-serif;
+  font-feature-settings: "cv02","cv03","cv04","cv11","ss01";
+  letter-spacing:.1px;
 }
 
 .tickets--logo{
@@ -146,3 +148,70 @@
   color:#eef2ff;
 }
 .tickets--metaBar .count strong{ color:#fff; }
+/* Meta bar superior: contador + acciones + campana */
+.tickets--metaBar{
+  max-width:1000px; margin:0 auto 10px;
+  display:flex; align-items:center; justify-content:space-between;
+  color:#eef2ff;
+}
+.tickets--metaBar .count strong{ color:#fff; }
+
+.metaBar__actions{ display:flex; align-items:center; gap:10px; }
+
+/* Campana */
+.bell-wrap{ position:relative; }
+.bell-btn{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px; border-radius:12px; border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.08); color:#fff; cursor:pointer;
+  box-shadow:0 6px 18px rgba(0,0,0,.2);
+}
+.bell-btn:hover{ background:rgba(255,255,255,.14); }
+.bell-btn[data-has-updates="true"]{ border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.25); }
+
+.bell-badge{
+  position:absolute; top:-6px; right:-6px; min-width:20px; height:20px; padding:0 6px;
+  background:#ef4444; color:#fff; border-radius:999px; font-size:12px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+
+/* Panel de novedades */
+.bell-panel{
+  position:absolute; right:0; top:48px; width:360px; max-width:85vw;
+  background:#0b1220; color:#fff; border:1px solid rgba(255,255,255,.12);
+  border-radius:14px; box-shadow:0 16px 32px rgba(0,0,0,.35); padding:10px;
+  z-index:9999;
+}
+.bell-panel__head{
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+}
+.btn-xs{ padding:6px 8px; border-radius:10px; font-size:12px; }
+
+.bell-empty{ color:#cbd5e1; padding:6px 0; }
+
+.bell-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+.bell-item{
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+  border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:6px;
+}
+.bell-title{ font-weight:700; font-size:14px; }
+.bell-tags{ display:flex; gap:6px; flex-wrap:wrap; }
+
+.tag{
+  display:inline-flex; align-items:center; gap:6px; padding:4px 8px; font-size:12px;
+  border-radius:999px; border:1px solid transparent; font-weight:700;
+}
+.tag-green{ background:#052e1b; border-color:rgba(34,197,94,.35); color:#86efac; }
+.tag-blue{ background:#0b1a37; border-color:rgba(59,130,246,.35); color:#93c5fd; }
+.tag-amber{ background:#3a2606; border-color:rgba(245,158,11,.35); color:#fcd34d; }
+
+/* Flash focus al abrir desde campana */
+.flash {
+  animation: flashFocus 1.2s ease-out;
+}
+@keyframes flashFocus {
+  0% { box-shadow: 0 0 0 0 rgba(14,165,233,0.0); }
+  30% { box-shadow: 0 0 0 6px rgba(14,165,233,0.18); }
+  70% { box-shadow: 0 0 0 3px rgba(14,165,233,0.12); }
+  100% { box-shadow: 0 0 0 0 rgba(14,165,233,0.0); }
+}

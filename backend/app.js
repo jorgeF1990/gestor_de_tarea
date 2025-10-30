@@ -1,38 +1,47 @@
 // backend/app.js
-
-// Cargar variables de entorno
 require('dotenv').config();
 
-// Importar dependencias
+// Dependencias
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 
-// Importar modelo necesario para la ruta de formulario de reset
+// Model usado por la ruta GET /auth/reset/:token (form HTML opcional)
 const User = require('./models/User');
 
-// Importar rutas
+// Rutas
 const authRoutes = require('./routes/auth.routes');
 const ticketRoutes = require('./routes/ticket.routes');
 
-// Inicializar la app
 const app = express();
 
-// Middlewares
-// Permitir CORS desde FRONTEND_URL si está configurado, si no permitir cualquier origen (útil en desarrollo)
+/* =========================
+   CORS
+   ========================= */
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim();
 app.use(cors({
-  origin: FRONTEND_URL || true
+  origin: FRONTEND_URL || true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
+
+/* =========================
+   Parsers
+   ========================= */
 app.use(express.json());
-// Permitir parsear body de formularios (form submissions desde HTML)
 app.use(express.urlencoded({ extended: true }));
 
-// Servir archivos estáticos desde /uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+/* =========================
+   Estáticos (logo y uploads)
+   ========================= */
+app.use(express.static(path.join(__dirname, 'public')));              // => /logo.png
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // => /uploads/<archivo>
 
-// Conexión a MongoDB
+/* =========================
+   MongoDB
+   ========================= */
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB conectado'))
   .catch(err => {
@@ -40,17 +49,18 @@ mongoose.connect(process.env.MONGO_URI)
     process.exit(1);
   });
 
-// Rutas principales
-app.use('/auth', authRoutes);       // /auth/login, /auth/register, /auth/recuperar, /auth/reset (POST)
-app.use('/tickets', ticketRoutes);  // /tickets
+/* =========================
+   Rutas principales
+   ========================= */
+app.use('/auth', authRoutes);       // /auth/*
+app.use('/tickets', ticketRoutes);  // /tickets/*
 
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.send('Backend funcionando correctamente');
-});
+/* =========================
+   Utilidades
+   ========================= */
+app.get('/', (_req, res) => res.send('Backend funcionando correctamente'));
 
-// Ruta para verificar conexión con MongoDB
-app.get('/ping-db', async (req, res) => {
+app.get('/ping-db', async (_req, res) => {
   try {
     await mongoose.connection.db.admin().ping();
     res.send('MongoDB responde correctamente');
@@ -60,15 +70,21 @@ app.get('/ping-db', async (req, res) => {
   }
 });
 
+app.get('/health', (_req, res) =>
+  res.json({ ok: true, version: process.env.VITE_VERSION || 'desconocida' })
+);
+
 /**
- * Ruta opcional que sirve un formulario HTML simple para restablecer contraseña.
- * Permite abrir el enlace enviado por correo (http://localhost:5001/auth/reset/:token)
- * y enviar un formulario directamente al POST /auth/reset/:token (que ya debe existir).
+ * Form HTML simple para restablecer contraseña (opcional).
+ * Sirve GET /auth/reset/:token y envía el form al POST /auth/reset/:token.
  */
 app.get('/auth/reset/:token', async (req, res) => {
   try {
     const { token } = req.params;
-    const usuario = await User.findOne({ resetToken: token, resetTokenExpira: { $gt: Date.now() } });
+    const usuario = await User.findOne({
+      resetToken: token,
+      resetTokenExpira: { $gt: Date.now() }
+    });
     if (!usuario) return res.status(400).send('Token inválido o expirado');
 
     return res.send(`
@@ -104,8 +120,11 @@ app.get('/auth/reset/:token', async (req, res) => {
   }
 });
 
-// Iniciar servidor
+/* =========================
+   Inicio servidor
+   ========================= */
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
+module.exports = app;

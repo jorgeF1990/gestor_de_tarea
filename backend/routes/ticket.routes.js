@@ -1,38 +1,47 @@
+// backend/routes/ticket.routes.js
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
+const multer = require('multer');
 
+const auth = require('../middlewares/authMiddleware');
 const {
   crearTicket,
+  agregarComentario,
   actualizarEstado,
   obtenerTickets,
-  marcarLeido,
-  agregarComentario
-} = require('../controllers/ticket.controller');
-
-const authMiddleware = require('../middlewares/authMiddleware');
-const esAdmin = require('../middlewares/esAdmin');
-const esSoporte = require('../middlewares/esSoporte');
+  marcarLeido
+} = require('../controllers/tickets.controller'); // Asegúrate del nombre real del archivo
 
 const router = express.Router();
 
+/* =========================
+   Multer a /uploads
+   ========================= */
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+  destination: (_req, _file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || '';
+    const base = path.basename(file.originalname, ext).replace(/\s+/g, '_');
+    cb(null, `${Date.now()}_${base}${ext}`);
   }
 });
-const upload = multer({ storage });
+const fileFilter = (_req, file, cb) => {
+  if (/^image\//i.test(file.mimetype)) return cb(null, true);
+  cb(new Error('Tipo de archivo no permitido'), false);
+};
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
-router.use(authMiddleware);
-
-router.post('/', upload.single('imagen'), crearTicket);
-router.put('/:id/comentario', upload.single('imagen'), agregarComentario);
-router.put('/:id/estado', esAdmin, actualizarEstado);
-router.put('/:id/leido', marcarLeido);
-
-router.get('/', obtenerTickets);
-router.get('/soporte', esSoporte, obtenerTickets);
+/* =========================
+   Rutas (protegidas)
+   ========================= */
+router.get('/', auth, obtenerTickets);
+router.post('/', auth, upload.single('imagen'), crearTicket);
+router.put('/:id/estado', auth, actualizarEstado);
+router.put('/:id/comentario', auth, upload.single('imagen'), agregarComentario);
+router.put('/:id/leido', auth, marcarLeido);
 
 module.exports = router;

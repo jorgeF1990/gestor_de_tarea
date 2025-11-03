@@ -134,6 +134,11 @@ exports.actualizarEstado = async (req, res) => {
   try {
     const { estado, prioridad, comentario } = req.body;
     const { id } = req.params;
+    const rol = req.user?.rol;
+    
+    if (!['admin','soporte'].includes(rol)) {
+      return res.status(403).json({ mensaje: 'No autorizado para cambiar estado o prioridad' });
+    }
 
     if (!req.user?.email) {
       return res.status(401).json({ mensaje: 'Usuario no autenticado' });

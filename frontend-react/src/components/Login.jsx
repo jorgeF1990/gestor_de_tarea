@@ -1,70 +1,129 @@
-// src/pages/Login.jsx
-import React, { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { login as loginAPI } from '../api';
-import { AuthContext } from '../context/AuthContext.jsx';
-import './Login.css';
+import React, { useContext, useState } from 'react';
+import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
+import { Link, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import './Auth.css';
 
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const { login } = useContext(AuthContext);
+const API = import.meta.env.VITE_BACKEND_URL;
+
+function Login() {
   const navigate = useNavigate();
-  const version = import.meta.env.VITE_VERSION;
+  const { login } = useContext(AuthContext); // ← usamos el contexto
+  const [email, setEmail] = useState('');
+  const [pass, setPass]   = useState('');
+  const [show, setShow]   = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState({ type: '', text: '' });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setMsg({ type:'', text:'' });
+
+    if (!email.trim() || !pass.trim()) {
+      setMsg({ type:'err', text:'Ingresá tu correo y contraseña.' });
+      return;
+    }
+
     try {
-      // loginAPI devuelve res.data (por el wrapper handle en src/api.js)
-      const data = await loginAPI({ email, password });
-      // data debe contener { token, usuario }
-      if (!data || !data.token) throw new Error('No se recibió token desde el servidor');
-      // Guardar token en el contexto (AuthContext.login debe manejar almacenamiento)
-      login(data.token);
-      navigate('/dashboard');
+      setLoading(true);
+      const { data } = await axios.post(`${API}/auth/login`, { email, password: pass });
+
+      if (!data?.token) {
+        setMsg({ type:'err', text:'Respuesta inválida del servidor.' });
+        return;
+      }
+
+      // 🔑 Guardar token en el contexto (esto dispara re-render global)
+      await login(data.token, { remember });
+
+      // (opcional) si querés seguir usando decode para alguna lógica local
+      try {
+        jwtDecode(data.token);
+      } catch {}
+
+      // 🧭 Ir al Home YA logueado (tu Home ya muestra crear ticket si hay user)
+      navigate('/');
+
     } catch (err) {
-      console.error('Login error:', err);
-      const msg = err?.message || err?.detalle || (err?.error || 'Credenciales inválidas');
-      setError(msg);
+      const text = err.response?.data?.error || 'No se pudo iniciar sesión.';
+      setMsg({ type:'err', text });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-container">
-      <img src="/logo.png" alt="Logo" className="login-logo" />
-      <h1 className="text-2xl font-bold text-black">Portfolio Investment</h1>
-      <h2>🔐 Iniciar sesión</h2>
-      <p>Accedé a tu cuenta para gestionar tus tickets de soporte.</p>
-
-      <form onSubmit={handleSubmit} className="login-form">
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          placeholder="📧 Email"
-          required
-          autoComplete="email"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          placeholder="🔑 Password"
-          required
-          autoComplete="current-password"
-        />
-        <div className="login-btn-wrapper">
-          <button type="submit" className="home-btn">➡️ Login</button>
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="auth-head">
+          <img src="/logo.png" alt="Logo" className="auth-logo" />
+          <div>
+            <div className="auth-title">Ingresar</div>
+            <div className="auth-sub">Portfolio Investment • Sistema de Tickets</div>
+          </div>
         </div>
-      </form>
 
-      {error && <p className="login-error">{error}</p>}
-      <p className="forgot-password">
-        <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
-      </p>
-      <p className="app-version">Versión: {version}</p>
+        {msg.text && <div className={`auth-msg ${msg.type}`}>{msg.text}</div>}
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="auth-row">
+            <label className="auth-label" htmlFor="email">Correo</label>
+            <input
+              id="email"
+              type="email"
+              className="auth-input"
+              placeholder="nombre@empresa.com"
+              value={email}
+              onChange={e=>setEmail(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <div className="auth-row">
+            <label className="auth-label" htmlFor="pass">Contraseña</label>
+            <div className="input-wrap">
+              <input
+                id="pass"
+                type={show ? 'text' : 'password'}
+                className="auth-input"
+                placeholder="••••••••"
+                value={pass}
+                onChange={e=>setPass(e.target.value)}
+              />
+              <button
+                type="button"
+                className="eye-btn"
+                onClick={()=>setShow(s=>!s)}
+                aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                title={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {show ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+
+          <div className="auth-row inline">
+            <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} />
+              Recordarme
+            </label>
+            <Link className="auth-link" to="/recuperar">¿Olvidaste la contraseña?</Link>
+          </div>
+
+          <button className="auth-btn" type="submit" disabled={loading}>
+            {loading ? <span className="loader" /> : 'Ingresar'}
+          </button>
+        </form>
+
+        <div className="auth-foot">
+          <span>¿No tenés cuenta?</span>
+          <Link className="auth-link" to="/register">Crear cuenta</Link>
+        </div>
+      </div>
     </div>
   );
 }
+
+export default Login;

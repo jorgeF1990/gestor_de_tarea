@@ -6,6 +6,40 @@ import './Dashboard.css';
 
 const SEEN_KEY_ADMIN = 'dashboard_last_seen:v1';
 const OPEN_KEY_ADMIN  = 'dashboard_open_cards:v1';
+const THEME_KEY       = 'dashboard-theme';
+const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
+
+/** ===== Helpers ===== */
+const getActivityTs = (t) => {
+  const created = t.fecha_creacion || t.createdAt;
+  const updated = t.fecha_actualizacion || t.updatedAt;
+  const lastHist = Array.isArray(t.historial) && t.historial.length
+    ? t.historial[t.historial.length - 1]?.fecha
+    : null;
+
+  const times = [
+    created ? new Date(created).getTime() : 0,
+    updated ? new Date(updated).getTime() : 0,
+    lastHist ? new Date(lastHist).getTime() : 0
+  ].filter(Boolean);
+
+  return times.length ? Math.max(...times) : 0;
+};
+
+const timeAgo = (dateLike) => {
+  if (!dateLike) return '—';
+  const ts = typeof dateLike === 'number' ? dateLike : new Date(dateLike).getTime();
+  if (!ts) return '—';
+  const diff = Date.now() - ts;
+  const s = Math.floor(diff/1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s/60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h} h`;
+  const d = Math.floor(h/24);
+  return `${d} d`;
+};
 
 function Dashboard() {
   const [tickets, setTickets] = useState([]);
@@ -17,10 +51,18 @@ function Dashboard() {
   const [flashIds, setFlashIds] = useState({});
   const [usuarioActual, setUsuarioAtual] = useState('');
   const [cambios, setCambios] = useState({});
+  const [loading, setLoading] = useState(false);
 
   // Campana de novedades
-  const [updates, setUpdates] = useState([]); // [{id, numero, asunto, changes: ['nuevo','comentario','estado','prioridad','imagen']}]
+  const [updates, setUpdates] = useState([]);
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Auto-refresh + saving por ticket
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [saving, setSaving] = useState({}); // { [ticketId]: boolean }
+
+  // Tema
+  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'light');
 
   // Toasts
   const [toasts, setToasts] = useState([]);
@@ -40,6 +82,15 @@ function Dashboard() {
     } catch {}
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ttl);
   };
+
+  /* ========================
+     Tema (aplicar al documento)
+     ======================== */
+  useEffect(() => {
+    const val = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', val);
+    localStorage.setItem(THEME_KEY, val);
+  }, [theme]);
 
   /* ========================
      Auth + carga inicial
@@ -63,6 +114,15 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, estadoFiltro, prioridadFiltro]);
 
+  // Auto-refresh cada 30s si está activado
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      cargarTickets({ silent: true });
+    }, 30000);
+    return () => clearInterval(id);
+  }, [autoRefresh, estadoFiltro, prioridadFiltro]);
+
   // Persistir abiertos
   useEffect(() => {
     try { localStorage.setItem(OPEN_KEY_ADMIN, JSON.stringify(abiertos)); } catch {}
@@ -71,21 +131,19 @@ function Dashboard() {
   /* ========================
      Cargar tickets
      ======================== */
-  const cargarTickets = async () => {
+  const cargarTickets = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
     if (estadoFiltro) params.append('estado', estadoFiltro);
     if (prioridadFiltro) params.append('prioridad', prioridadFiltro);
     try {
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/tickets?${params.toString()}`, {
+      const res = await axios.get(`${API}/tickets?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Orden: “nuevos” (pendiente + historial=1) primero
-      const ordenados = res.data.slice().sort((a, b) => {
-        const aNuevo = a.estado === 'pendiente' && a.historial?.length === 1;
-        const bNuevo = b.estado === 'pendiente' && b.historial?.length === 1;
-        return (bNuevo ? 1 : 0) - (aNuevo ? 1 : 0);
-      });
+
+      // Ordenar por “última actividad” desc (más recientes arriba)
+      const ordenados = res.data.slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
       setTickets(ordenados);
 
       // limpiar abiertos sin ID
@@ -100,6 +158,8 @@ function Dashboard() {
     } catch {
       setTickets([]);
       setUpdates([]);
+    } finally {
+      if (!silent) setLoading(false);
     }
   };
 
@@ -113,7 +173,7 @@ function Dashboard() {
 
     if (!nuevoEstado && !nuevaPrioridad) {
       setMensajes(prev => ({ ...prev, [id]: '⚠️ No hay cambios de estado o prioridad' }));
-      return;
+      return { ok: false, reason: 'nochanges' };
     }
 
     const payload = {};
@@ -122,19 +182,21 @@ function Dashboard() {
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/tickets/${id}/estado`,
+        `${API}/tickets/${id}/estado`,
         payload,
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-      setTickets(prev => prev.map(t => t._id === id ? { ...t, ...payload } : t));
-      setCambios(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setTickets(prev => prev.map(t => t._id === id ? { ...t, ...payload, fecha_actualizacion: new Date().toISOString() } : t));
+      setCambios(prev => { const n = { ...prev }; delete n[id]?.nuevoEstado; delete n[id]?.nuevaPrioridad; return n; });
       setMensajes(prev => ({ ...prev, [id]: '✅ Estado/prioridad actualizado' }));
       showToast('Ticket actualizado', 'success');
-      await cargarTickets();
+      await cargarTickets({ silent: true });
+      return { ok: true };
     } catch (err) {
       const mensajeError = err.response?.data?.message || '❌ Error al actualizar estado/prioridad';
       setMensajes(prev => ({ ...prev, [id]: mensajeError }));
       showToast('No se pudo actualizar', 'error');
+      return { ok: false, error: err };
     }
   };
 
@@ -148,7 +210,7 @@ function Dashboard() {
 
     if (!nuevoComentario && !nuevoArchivo) {
       setMensajes(prev => ({ ...prev, [id]: '⚠️ Comentario vacío' }));
-      return;
+      return { ok: false, reason: 'empty' };
     }
 
     const formData = new FormData();
@@ -157,18 +219,20 @@ function Dashboard() {
 
     try {
       await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/tickets/${id}/comentario`,
+        `${API}/tickets/${id}/comentario`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setCambios(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setCambios(prev => { const n = { ...prev }; if (n[id]) { delete n[id].nuevoComentario; delete n[id].nuevoArchivo; } return n; });
       setMensajes(prev => ({ ...prev, [id]: '✅ Comentario guardado' }));
       showToast('Comentario agregado', 'success');
-      await cargarTickets();
+      await cargarTickets({ silent: true });
+      return { ok: true };
     } catch (err) {
       const mensajeError = err.response?.data?.message || '❌ Error al guardar comentario';
       setMensajes(prev => ({ ...prev, [id]: mensajeError }));
       showToast('No se pudo comentar', 'error');
+      return { ok: false, error: err };
     }
   };
 
@@ -178,12 +242,8 @@ function Dashboard() {
   const marcarLeido = async (id) => {
     const token = localStorage.getItem('token');
     try {
-      await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/tickets/${id}/leido`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await cargarTickets();
+      await axios.put(`${API}/tickets/${id}/leido`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      await cargarTickets({ silent: true });
     } catch (err) {
       console.error('Error al marcar como leído:', err.message);
     }
@@ -242,7 +302,7 @@ function Dashboard() {
   };
 
   /* ========================
-     Novedades (campana) — sin auto-notificarse
+     Novedades (campana)
      ======================== */
   const getSeenSnapshot = () => {
     try { const raw = localStorage.getItem(SEEN_KEY_ADMIN); if (raw) return JSON.parse(raw); } catch {}
@@ -326,6 +386,81 @@ function Dashboard() {
   };
 
   /* ========================
+     Guardar cambios (secuencial)
+     ======================== */
+  const guardarCambios = async (ticketId) => {
+    if (saving[ticketId]) return;
+    const cambio = cambios[ticketId] || {};
+    const wantsEstado = !!cambio.nuevoEstado || !!cambio.nuevaPrioridad;
+    const wantsComentario = !!cambio.nuevoComentario || !!cambio.nuevoArchivo;
+
+    if (!wantsEstado && !wantsComentario) {
+      setMensajes(prev => ({ ...prev, [ticketId]: '⚠️ No hay nada para guardar' }));
+      return;
+    }
+
+    setSaving(prev => ({ ...prev, [ticketId]: true }));
+    setMensajes(prev => ({ ...prev, [ticketId]: '' }));
+
+    // 1) Primero estado/prioridad
+    if (wantsEstado) {
+      const r1 = await actualizarTicket(ticketId);
+      if (!r1?.ok && r1?.reason !== 'nochanges') {
+        setSaving(prev => ({ ...prev, [ticketId]: false }));
+        return;
+      }
+    }
+
+    // 2) Luego comentario/imagen
+    if (wantsComentario) {
+      const r2 = await agregarComentarioDesdeDashboard(ticketId);
+      if (!r2?.ok && r2?.reason !== 'empty') {
+        setSaving(prev => ({ ...prev, [ticketId]: false }));
+        return;
+      }
+    }
+
+    setSaving(prev => ({ ...prev, [ticketId]: false }));
+    // Reordenar por última actividad sin pedir al server (optimista)
+    setTickets(prev => prev.slice().sort((a, b) => getActivityTs(b) - getActivityTs(a)));
+  };
+
+  /* ========================
+     Búsqueda + paginación
+     ======================== */
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    const saved = Number(localStorage.getItem('dashboard-page-size') || 10);
+    return [5,10,15,20,30,50].includes(saved) ? saved : 10;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dashboard-page-size', pageSize);
+    setPage(1); // si cambia el tamaño, volvemos a la primera página
+  }, [pageSize]);
+
+  const filteredTickets = useMemo(() => {
+    const q = busquedaTexto.trim().toLowerCase();
+    return tickets.filter(ticket => {
+      if (!q) return true;
+      return (
+        ticket.numero_ticket?.toString().includes(q) ||
+        ticket.asunto?.toLowerCase().includes(q) ||
+        ticket.descripcion?.toLowerCase().includes(q) ||
+        ticket.usuario_id?.email?.toLowerCase().includes(q)
+      );
+    });
+  }, [tickets, busquedaTexto]);
+
+  const pages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
+  const pageData = filteredTickets.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    // Si los filtros/búsqueda dejan menos páginas de las actuales, ajustamos
+    if (page > pages) setPage(pages);
+  }, [pages, page]);
+
+  /* ========================
      Render
      ======================== */
   return (
@@ -338,7 +473,28 @@ function Dashboard() {
             <p className="muted">Administración • Portfolio Investment</p>
           </div>
         </div>
+
+        {/* Acciones topbar */}
         <div className="topbar-actions">
+          <div className="topbar-group" style={{gap:8}}>
+            
+
+            {/* Auto refresh */}
+            <label className="muted" style={{display:'flex', alignItems:'center', gap:8, cursor:'pointer'}}>
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={e => setAutoRefresh(e.target.checked)}
+              />
+              Auto 30s
+            </label>
+
+            <button className="btn btn-secondary btn-xs" onClick={()=>cargarTickets()}>
+              {loading ? 'Actualizando…' : 'Refrescar'}
+            </button>
+          </div>
+
+          {/* Campana */}
           <div className="bell-wrap">
             <button
               className="bell-btn"
@@ -396,6 +552,8 @@ function Dashboard() {
         </div>
       </header>
 
+      
+
       {/* Resumen */}
       <div className="dashboard-resumen">
         <div className="resumen-card" style={{ borderLeft: `6px solid ${colorEstado.abierto}` }}>
@@ -431,11 +589,11 @@ function Dashboard() {
         className="dashboard-search"
         placeholder="Buscar por ticket, asunto, descripción o usuario"
         value={busquedaTexto}
-        onChange={e => setBusquedaTexto(e.target.value)}
+        onChange={e => { setBusquedaTexto(e.target.value); setPage(1); }}
       />
 
       <div className="dashboard-filters">
-        <select onChange={e => setEstadoFiltro(e.target.value)} value={estadoFiltro}>
+        <select onChange={e => { setEstadoFiltro(e.target.value); setPage(1); }} value={estadoFiltro}>
           <option value="">Todos los estados</option>
           <option value="abierto">Abierto</option>
           <option value="pendiente">Pendiente</option>
@@ -445,231 +603,260 @@ function Dashboard() {
           <option value="reabierto">Reabierto</option>
           <option value="cancelado">Cancelado</option>
         </select>
-        <select onChange={e => setPrioridadFiltro(e.target.value)} value={prioridadFiltro} style={{ marginLeft: '10px' }}>
+        <select onChange={e => { setPrioridadFiltro(e.target.value); setPage(1); }} value={prioridadFiltro} style={{ marginLeft: '10px' }}>
           <option value="">Todas las prioridades</option>
           <option value="baja">Baja</option>
           <option value="media">Media</option>
           <option value="alta">Alta</option>
         </select>
+
+        <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:8}}>
+          <span className="muted">Por página</span>
+          <select
+            className="btn btn-secondary btn-xs"
+            value={pageSize}
+            onChange={e => setPageSize(Number(e.target.value))}
+          >
+            {[5,10,15,20,30,50].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
       </div>
 
-      {tickets
-        .filter(ticket => {
-          const q = busquedaTexto.toLowerCase();
-          if (!q) return true;
-          return (
-            ticket.numero_ticket?.toString().includes(q) ||
-            ticket.asunto?.toLowerCase().includes(q) ||
-            ticket.descripcion?.toLowerCase().includes(q) ||
-            ticket.usuario_id?.email?.toLowerCase().includes(q)
-          );
-        })
-        .map(ticket => {
-          const esNuevo = ticket.estado === 'pendiente' && ticket.historial?.length === 1;
-          const abierto = !!abiertos[ticket._id];
-          const comentarioNuevo = tieneComentarioNuevoDeOtro(ticket);
-          const cambio = cambios[ticket._id] || {};
+      {/* LISTA paginada */}
+      {loading && (
+        <div className="empty"><span className="loader" /> Cargando…</div>
+      )}
 
-          return (
-            <div
-              key={ticket._id}
-              id={`dash-ticket-${ticket._id}`}
-              className={`dashboard-ticket ${esNuevo ? 'highlight' : ''} ${flashIds[ticket._id] ? 'flash' : ''}`}
-            >
-              <div className="dashboard-ticket-header">
-                <p><strong>Ticket #{ticket.numero_ticket}</strong></p>
-                {comentarioNuevo && <span className="dashboard-new-comment">🆕 Nuevo comentario sin leer</span>}
-                <button onClick={() => toggleTicket(ticket._id)}>
-                  {abierto ? '🔽 Cerrar' : '▶️ Abrir'}
-                </button>
-              </div>
+      {!loading && pageData.length === 0 && (
+        <div className="empty">No hay resultados con los filtros actuales.</div>
+      )}
 
-              {!abierto && (
+      {!loading && pageData.length > 0 && pageData.map(ticket => {
+        const esNuevo = ticket.estado === 'pendiente' && ticket.historial?.length === 1;
+        const abierto = !!abiertos[ticket._id];
+        const comentarioNuevo = tieneComentarioNuevoDeOtro(ticket);
+        const cambio = cambios[ticket._id] || {};
+        const createdAt = ticket.fecha_creacion || ticket.createdAt;
+        const lastTs = getActivityTs(ticket);
+
+        return (
+          <div
+            key={ticket._id}
+            id={`dash-ticket-${ticket._id}`}
+            className={`dashboard-ticket ${esNuevo ? 'highlight' : ''} ${flashIds[ticket._id] ? 'flash' : ''}`}
+          >
+            <div className="dashboard-ticket-header">
+              <p>
+                <strong>Ticket #{ticket.numero_ticket}</strong>
+                <span className="chip-mini" title="Última actividad" style={{ marginLeft: 8 }}>
+                  ⏱ {timeAgo(lastTs)}
+                </span>
+              </p>
+              {comentarioNuevo && <span className="dashboard-new-comment">🆕 Nuevo comentario sin leer</span>}
+              <button onClick={() => toggleTicket(ticket._id)}>
+                {abierto ? '🔽 Cerrar' : '▶️ Abrir'}
+              </button>
+            </div>
+
+            {!abierto && (
+              <p>
+                <strong>Estado actual:</strong>{' '}
+                <span className={`dashboard-status ${ticket.estado}`}>{ticket.estado}</span>{' '}
+                / <strong>Prioridad:</strong> <em>{ticket.prioridad}</em>{' '}
+                / <strong>Usuario:</strong> {ticket.usuario_id?.email}{' '}
+                / <strong>Creado:</strong> {createdAt ? new Date(createdAt).toLocaleString() : '—'}
+              </p>
+            )}
+
+            {abierto && (
+              <>
+                <p><strong>Asunto:</strong> {ticket.asunto}</p>
+                <p><strong>Descripción:</strong> {ticket.descripcion}</p>
                 <p>
                   <strong>Estado actual:</strong>{' '}
                   <span className={`dashboard-status ${ticket.estado}`}>{ticket.estado}</span>{' '}
-                  / <strong>Prioridad:</strong> <em>{ticket.prioridad}</em>{' '}
-                  / <strong>Usuario:</strong> {ticket.usuario_id?.email}{' '}
-                  / <strong>Fecha de creación:</strong> {new Date(ticket.fecha_creacion).toLocaleString()}
+                  - <strong>Prioridad:</strong> <em>{ticket.prioridad}</em>
+                  {' '}- <strong>Últ. actividad:</strong> {timeAgo(lastTs)}
                 </p>
-              )}
+                <p><strong>Correo del usuario:</strong> {ticket.usuario_id?.email}</p>
+                <p><strong>Fecha de creación:</strong> {createdAt ? new Date(createdAt).toLocaleString() : '—'}</p>
 
-              {abierto && (
-                <>
-                  <p><strong>Asunto:</strong> {ticket.asunto}</p>
-                  <p><strong>Descripción:</strong> {ticket.descripcion}</p>
-                  <p>
-                    <strong>Estado actual:</strong>{' '}
-                    <span className={`dashboard-status ${ticket.estado}`}>{ticket.estado}</span>{' '}
-                    - <strong>Prioridad:</strong> <em>{ticket.prioridad}</em>
-                  </p>
-                  <p><strong>Correo del usuario:</strong> {ticket.usuario_id?.email}</p>
-                  <p><strong>Fecha de creación:</strong> {new Date(ticket.fecha_creacion).toLocaleString()}</p>
+                {esNuevo && <p className="dashboard-new-comment">🆕 Ticket nuevo sin procesar</p>}
 
-                  {esNuevo && <p className="dashboard-new-comment">🆕 Ticket nuevo sin procesar</p>}
-
-                  {ticket.imagen && (
-                    <div>
-                      <p><strong>Imagen adjunta:</strong></p>
-                      <a
-                        href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${ticket.imagen}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${ticket.imagen}`}
-                          alt="Adjunto"
-                          width="200"
-                          style={{ border: '1px solid #ccc', marginTop: '10px', borderRadius: 8 }}
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'https://via.placeholder.com/200?text=Imagen+no+disponible';
-                          }}
-                        />
-                      </a>
-                    </div>
-                  )}
-
-                  {ticket.historial?.length > 0 && (
-                    <ul className="dashboard-history ticket-history">
-                      {ticket.historial.map((h, i) => (
-                        <li key={i}>
-                          {new Date(h.fecha).toLocaleString()} - <strong>{h.estado}</strong>: {h.comentario} {h.autor && `(${h.autor})`}
-                          {h.imagen && (
-                            <div>
-                              <a
-                                href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <img
-                                  src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
-                                  alt="Adjunto"
-                                  width="150"
-                                  style={{ marginTop: '5px', border: '1px solid #e5e7eb', borderRadius: 8 }}
-                                />
-                              </a>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {/* Acciones */}
-                  <div className="actions-card">
-                    <div className="actions-header">
-                      <div>
-                        <div className="actions-title">Actualizar ticket</div>
-                        <div className="actions-subtitle">Estado, prioridad y comentario con adjunto</div>
-                      </div>
-                    </div>
-
-                    <div className="actions-grid">
-                      <div className="form-item">
-                        <label className="form-label">Nuevo estado</label>
-                        <select
-                          className="form-select"
-                          value={cambio.nuevoEstado || ''}
-                          onChange={e => onCambio(ticket._id, 'nuevoEstado', e.target.value)}
-                        >
-                          <option value="" disabled>Seleccionar…</option>
-                          <option value="abierto">Abierto</option>
-                          <option value="pendiente">Pendiente</option>
-                          <option value="en_proceso">En proceso</option>
-                          <option value="resuelto">Resuelto</option>
-                          <option value="cerrado">Cerrado</option>
-                          <option value="reabierto">Reabierto</option>
-                          <option value="cancelado">Cancelado</option>
-                        </select>
-                      </div>
-
-                      <div className="form-item">
-                        <label className="form-label">Nueva prioridad</label>
-                        <select
-                          className="form-select"
-                          value={cambio.nuevaPrioridad || ''}
-                          onChange={e => onCambio(ticket._id, 'nuevaPrioridad', e.target.value)}
-                        >
-                          <option value="" disabled>Seleccionar…</option>
-                          <option value="baja">Baja</option>
-                          <option value="media">Media</option>
-                          <option value="alta">Alta</option>
-                        </select>
-                      </div>
-
-                      <div className="form-item form-item--wide">
-                        <label className="form-label">Comentario</label>
-                        <textarea
-                          className="form-textarea"
-                          placeholder="Escribí el comentario… (podés pegar una captura con Ctrl+V)"
-                          value={cambio.nuevoComentario || ''}
-                          onChange={e => onCambio(ticket._id, 'nuevoComentario', e.target.value)}
-                          onPaste={e => {
-                            const items = e.clipboardData.items;
-                            for (let i = 0; i < items.length; i++) {
-                              if (items[i].type.indexOf('image') !== -1) {
-                                const file = items[i].getAsFile();
-                                onCambio(ticket._id, 'nuevoArchivo', file);
-                              }
-                            }
-                          }}
-                          rows={3}
-                          autoComplete="off"
-                          autoCorrect="off"
-                          spellCheck={false}
-                        />
-                        <div className="hint-row">
-                          <span className="hint">Sugerencia: arrastrá o pegá una captura</span>
-                          <span className="counter">{(cambio.nuevoComentario || '').length}/1000</span>
-                        </div>
-                      </div>
-
-                      <div className="form-item form-item--wide">
-                        <label className="form-label">Adjuntar imagen</label>
-                        <div
-                          className="dropzone pretty"
-                          onDragOver={e => e.preventDefault()}
-                          onDrop={e => {
-                            e.preventDefault();
-                            const file = e.dataTransfer.files?.[0];
-                            onCambio(ticket._id, 'nuevoArchivo', file);
-                          }}
-                        >
-                          <input
-                            id={`file-${ticket._id}`}
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={e => onCambio(ticket._id, 'nuevoArchivo', e.target.files?.[0])}
-                          />
-                          <label htmlFor={`file-${ticket._id}`} className="btn btn-secondary">Elegir imagen</label>
-                          {cambio.nuevoArchivo && <span className="file-name">{cambio.nuevoArchivo.name || 'captura'}</span>}
-                          {cambio.nuevoArchivo && (
-                            <button className="btn btn-ghost" type="button" onClick={() => onCambio(ticket._id, 'nuevoArchivo', null)}>Quitar</button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="actions-footer">
-                      <button
-                        onClick={() => {
-                          if (cambio.nuevoEstado || cambio.nuevaPrioridad) actualizarTicket(ticket._id);
-                          if (cambio.nuevoComentario || cambio.nuevoArchivo) agregarComentarioDesdeDashboard(ticket._id);
+                {ticket.imagen && (
+                  <div>
+                    <p><strong>Imagen adjunta:</strong></p>
+                    <a
+                      href={`${API}/uploads/${ticket.imagen}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        src={`${API}/uploads/${ticket.imagen}`}
+                        alt="Adjunto"
+                        width="200"
+                        style={{ border: '1px solid #ccc', marginTop: '10px', borderRadius: 8 }}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://via.placeholder.com/200?text=Imagen+no+disponible';
                         }}
-                        className="btn"
-                      >
-                        Guardar cambios
-                      </button>
-                      {mensajes[ticket._id] && <span className="status-msg">{mensajes[ticket._id]}</span>}
+                      />
+                    </a>
+                  </div>
+                )}
+
+                {ticket.historial?.length > 0 && (
+                  <ul className="dashboard-history ticket-history">
+                    {ticket.historial.map((h, i) => (
+                      <li key={i}>
+                        {new Date(h.fecha).toLocaleString()} - <strong>{h.estado}</strong>: {h.comentario} {h.autor && `(${h.autor})`}
+                        {h.imagen && (
+                          <div>
+                            <a
+                              href={`${API}/uploads/${h.imagen}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <img
+                                src={`${API}/uploads/${h.imagen}`}
+                                alt="Adjunto"
+                                width="150"
+                                style={{ marginTop: '5px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = 'https://via.placeholder.com/150?text=Imagen';
+                                }}
+                              />
+                            </a>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Acciones */}
+                <div className="actions-card">
+                  <div className="actions-header">
+                    <div>
+                      <div className="actions-title">Actualizar ticket</div>
+                      <div className="actions-subtitle">Estado, prioridad y comentario con adjunto</div>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-          );
-        })}
+
+                  <div className="actions-grid">
+                    <div className="form-item">
+                      <label className="form-label">Nuevo estado</label>
+                      <select
+                        className="form-select"
+                        value={cambio.nuevoEstado || ''}
+                        onChange={e => onCambio(ticket._id, 'nuevoEstado', e.target.value)}
+                      >
+                        <option value="" disabled>Seleccionar…</option>
+                        <option value="Abierto">Abierto</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En_proceso">En proceso</option>
+                        <option value="Resuelto">Resuelto</option>
+                        <option value="Cerrado">Cerrado</option>
+                        <option value="Reabierto">Reabierto</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
+                    </div>
+
+                    <div className="form-item">
+                      <label className="form-label">Nueva prioridad</label>
+                      <select
+                        className="form-select"
+                        value={cambio.nuevaPrioridad || ''}
+                        onChange={e => onCambio(ticket._id, 'nuevaPrioridad', e.target.value)}
+                      >
+                        <option value="" disabled>Seleccionar…</option>
+                        <option value="Baja">Baja</option>
+                        <option value="Media">Media</option>
+                        <option value="Alta">Alta</option>
+                      </select>
+                    </div>
+
+                    <div className="form-item form-item--wide">
+                      <label className="form-label">Comentario</label>
+                      <textarea
+                        className="form-textarea"
+                        placeholder="Escribí el comentario… (podés pegar una captura con Ctrl+V)"
+                        value={cambio.nuevoComentario || ''}
+                        onChange={e => onCambio(ticket._id, 'nuevoComentario', e.target.value)}
+                        onPaste={e => {
+                          const items = e.clipboardData.items;
+                          for (let i = 0; i < items.length; i++) {
+                            if (items[i].type.indexOf('image') !== -1) {
+                              const file = items[i].getAsFile();
+                              onCambio(ticket._id, 'nuevoArchivo', file);
+                            }
+                          }
+                        }}
+                        rows={3}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                      />
+                      <div className="hint-row">
+                        <span className="hint">Sugerencia: arrastrá o pegá una captura</span>
+                        <span className="counter">{(cambio.nuevoComentario || '').length}/1000</span>
+                      </div>
+                    </div>
+
+                    <div className="form-item form-item--wide">
+                      <label className="form-label">Adjuntar imagen</label>
+                      <div
+                        className="dropzone pretty"
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files?.[0];
+                          onCambio(ticket._id, 'nuevoArchivo', file);
+                        }}
+                      >
+                        <input
+                          id={`file-${ticket._id}`}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={e => onCambio(ticket._id, 'nuevoArchivo', e.target.files?.[0])}
+                        />
+                        <label htmlFor={`file-${ticket._id}`} className="btn btn-secondary">Elegir imagen</label>
+                        {cambio.nuevoArchivo && <span className="file-name">{cambio.nuevoArchivo.name || 'captura'}</span>}
+                        {cambio.nuevoArchivo && (
+                          <button className="btn btn-ghost" type="button" onClick={() => onCambio(ticket._id, 'nuevoArchivo', null)}>Quitar</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="actions-footer">
+                    <button
+                      onClick={() => guardarCambios(ticket._id)}
+                      className="btn"
+                      disabled={!!saving[ticket._id]}
+                      title={saving[ticket._id] ? 'Guardando…' : 'Guardar cambios'}
+                    >
+                      {saving[ticket._id] ? 'Guardando…' : 'Guardar cambios'}
+                    </button>
+                    {mensajes[ticket._id] && <span className="status-msg">{mensajes[ticket._id]}</span>}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Paginador */}
+      {!loading && filteredTickets.length > 0 && (
+        <div className="tks-pag" style={{marginTop:16}}>
+          <button className="btn" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Anterior</button>
+          <span className="tks-badge">{page} / {pages}</span>
+          <button className="btn" disabled={page>=pages} onClick={()=>setPage(p=>p+1)}>Siguiente</button>
+        </div>
+      )}
 
       {/* Toasts */}
       <div className="toast-wrap">

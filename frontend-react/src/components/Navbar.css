@@ -1,44 +1,53 @@
-.navbar {
-  background-color: #1e3a8a;
-  /* Azul oscuro */
-  color: #ffffff;
-  padding: 12px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* frontend-react/src/components/Navbar.css */
+:root{
+  --nav-bg:#ffffff;
+  --nav-border:#e5e7eb;
+  --text:#111827;
+  --muted:#6b7280;
+  --brand:#4f46e5;
+  --panel:#f9fafb;
 }
 
-.navbar a {
-  color: #ffffff;
-  text-decoration: none;
-  margin: 0 8px;
-  font-weight: 500;
-  transition: color 0.2s ease-in-out;
+.navbar{
+  position:sticky; top:0; z-index:40;
+  background:var(--nav-bg);
+  border-bottom:1px solid var(--nav-border);
 }
 
-.navbar a:hover {
-  color: #93c5fd;
-  /* Azul claro al pasar el mouse */
+.navbar-inner{
+  max-width:1200px; margin:0 auto; padding:10px 16px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
 }
 
-.navbar span {
-  margin-right: 12px;
-  font-weight: 500;
+.navbar-left{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+.brand{
+  display:flex; align-items:center; gap:8px; text-decoration:none; margin-right:8px;
+}
+.brand-logo{ width:28px; height:28px; object-fit:contain; border-radius:8px; border:1px solid var(--nav-border); background:#fff; }
+.brand-name{ font-weight:800; color:var(--text); }
+
+.nav-link{
+  color:var(--text); text-decoration:none; padding:6px 10px; border-radius:8px;
+}
+.nav-link:hover{ background:var(--panel); }
+
+.navbar-right{
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.navbar-user{
+  color:var(--muted); font-size:14px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  background:var(--panel); padding:6px 10px; border-radius:8px; border:1px solid var(--nav-border);
 }
 
-.navbar button {
-  background-color: #2563eb;
-  /* Azul medio */
-  color: #ffffff;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease-in-out;
+.btn{
+  background:var(--brand); color:#fff; border:1px solid var(--brand);
+  padding:8px 12px; border-radius:10px; text-decoration:none; font-weight:700;
 }
+.btn:hover{ filter:brightness(0.95); }
+.btn:active{ transform:translateY(1px); }
 
-.navbar button:hover {
-  background-color: #1d4ed8;
-  /* Azul más oscuro */
+.btn.btn-outline{
+  background:#fff; color:var(--text); border:1px solid var(--nav-border);
 }
+.btn.btn-outline:hover{ background:var(--panel); }

@@ -1,0 +1,256 @@
+:root {
+  /* --- Modo claro --- */
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #111827;
+  --sidebar-border: #e5e7eb;
+  --sidebar-section-title: #6b7280;
+
+  --sidebar-link-hover-bg: rgba(15, 23, 42, 0.06);
+  --sidebar-link-active-bg: rgba(15, 23, 42, 0.1);
+  --sidebar-link-text: #111827;
+  --sidebar-link-active-text: #0f172a;
+
+  --sidebar-btn-bg: #111827;
+  --sidebar-btn-text: #ffffff;
+  --sidebar-btn-hover-bg: #1e293b;
+}
+
+[data-theme="dark"] {
+  /* --- Modo oscuro --- */
+  --sidebar-bg: #111827;
+  --sidebar-text: #e5e7eb;
+  --sidebar-border: #374151;
+  --sidebar-section-title: #9ca3af;
+
+  --sidebar-link-hover-bg: rgba(255, 255, 255, 0.06);
+  --sidebar-link-active-bg: rgba(255, 255, 255, 0.14);
+  --sidebar-link-text: #e5e7eb;
+  --sidebar-link-active-text: #ffffff;
+
+  --sidebar-btn-bg: #e5e7eb;
+  --sidebar-btn-text: #111827;
+  --sidebar-btn-hover-bg: #d1d5db;
+}
+
+/* ===== Sidebar base ===== */
+.sidebar {
+  width: 250px;
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Compacto */
+.sidebar--closed {
+  width: 70px;
+}
+
+/* ===== Header ===== */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.sidebar-burger {
+  background: none;
+  border: none;
+  color: var(--sidebar-text);
+  font-size: 1.2rem;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.sidebar-logo {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+}
+
+.sidebar-brandtext {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.sidebar-title {
+  font-weight: bold;
+  font-size: 1rem;
+  color: var(--sidebar-text);
+}
+
+.sidebar-sub {
+  font-size: 0.8rem;
+  color: var(--sidebar-section-title);
+}
+
+/* ===== Secciones ===== */
+.sidebar-section {
+  padding: 10px 0;
+}
+
+.sidebar-section-title {
+  padding: 6px 18px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--sidebar-section-title);
+}
+
+/* ===== Links ===== */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  text-decoration: none;
+  color: var(--sidebar-link-text);
+  border-radius: 8px;
+  margin: 2px 8px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-link:hover {
+  background-color: var(--sidebar-link-hover-bg);
+}
+
+.sidebar-link.active,
+.sidebar-link[aria-current="page"] {
+  background-color: var(--sidebar-link-active-bg);
+  color: var(--sidebar-link-active-text);
+}
+
+/* ===== Usuario ===== */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  padding: 10px 18px;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  background-color: var(--sidebar-section-title);
+  border-radius: 50%;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.user-email {
+  font-size: 0.9rem;
+  color: var(--sidebar-link-text);
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: var(--sidebar-section-title);
+}
+
+/* ===== Botón Salir ===== */
+.sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  margin: 4px 8px;
+  width: calc(100% - 16px);
+  border: none;
+  border-radius: 8px;
+  background-color: var(--sidebar-btn-bg);
+  color: var(--sidebar-btn-text);
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-btn:hover {
+  background-color: var(--sidebar-btn-hover-bg);
+}
+
+/* ===== Footer ===== */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 10px;
+  text-align: center;
+  border-top: 1px solid var(--sidebar-border);
+  color: var(--sidebar-section-title);
+}
+
+.footer-badge {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+/* ===== Modo cerrado ===== */
+.sidebar--closed .sidebar-brandtext,
+.sidebar--closed .sidebar-section-title,
+.sidebar--closed .label,
+.sidebar--closed .user-meta {
+  display: none;
+}
+
+.sidebar--closed .sidebar-link {
+  justify-content: center;
+  padding: 10px;
+}
+
+.sidebar--closed .sidebar-user {
+  justify-content: center;
+}
+/* ===== Logo visible en ambos modos ===== */
+.sidebar-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--sidebar-text) 6%, transparent);
+  transition: background 0.3s ease, filter 0.3s ease;
+}
+
+.sidebar-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  filter: var(--logo-filter);
+  transition: filter 0.3s ease;
+}
+
+/* Cambiar filtro del logo según tema */
+:root {
+  --logo-filter: none;
+}
+[data-theme="dark"] {
+  --logo-filter: brightness(1.2) contrast(1.1);
+}
+
+/* Estado cerrado: centrar y ajustar tamaño */
+.sidebar--closed .sidebar-logo-wrap {
+  margin: 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+}
+.sidebar--closed .sidebar-logo {
+  width: 40px;
+  height: 40px;
+}
+
+/* Espaciado en modo abierto */
+.sidebar--open .sidebar-logo-wrap {
+  margin-right: 10px;
+}

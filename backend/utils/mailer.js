@@ -12,13 +12,17 @@ const SMTP_SECURE = SMTP_PORT === 465; // 465=SSL; 587=STARTTLS
 const EMAIL_FROM = process.env.EMAIL_FROM;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 
+// Opcionales: CC/BCC globales
+const MAIL_CC  = process.env.MAIL_CC  || '';
+const MAIL_BCC = process.env.MAIL_BCC || '';
+
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
   secure: SMTP_SECURE,
   pool: true,
   maxConnections: 5,
-  maxMessages: 50,
+  maxMessages: 100,
   auth: { user: EMAIL_FROM, pass: EMAIL_PASS },
   tls: { minVersion: 'TLSv1.2' }
 });
@@ -45,9 +49,7 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
 const BACKEND_URL  = (process.env.BACKEND_URL  || process.env.APP_URL || '').replace(/\/$/, '');
 const BRAND_NAME   = process.env.BRAND_NAME || 'Portfolio Investment';
 
-/**
- * Construye URL pública de imágenes (historial/adjuntos)
- */
+/** Construye URL pública de imágenes (historial/adjuntos) */
 const makeImageUrl = (filename) => {
   if (!filename) return null;
   if (/^https?:\/\//i.test(filename)) return filename;
@@ -56,10 +58,7 @@ const makeImageUrl = (filename) => {
   return null;
 };
 
-/**
- * Enlace al ticket configurable
- * FRONTEND_TICKET_PATH: /tickets/:id  o  /tickets/numero/:numero
- */
+/** Enlace al ticket configurable: FRONTEND_TICKET_PATH: /tickets/:id  o  /tickets/numero/:numero */
 function buildTicketLink(ticket) {
   const base = FRONTEND_URL || 'http://localhost:3000';
   const pattern = (process.env.FRONTEND_TICKET_PATH || '/tickets/:id').trim();
@@ -69,81 +68,52 @@ function buildTicketLink(ticket) {
   return `${base}${pathOut}`;
 }
 
-/**
- * Resuelve el LOGO priorizando:
- *  1) BRAND_LOGO_FILE (ruta local explícita)
- *  2) backend/public/logo.png (ruta local por defecto en backend)
- *  3) BRAND_LOGO_URL absoluta
- *  4) BACKEND_URL + /logo.png  (si servís static de backend/public)
- *  5) FRONTEND_URL + /logo.png (fallback)
- *
- * Devuelve { htmlTag, attachment } listo para usar en el mail.
- */
+/** Logo: prioriza CID y luego URL */
 function buildLogoBlock() {
   const logoFileEnv = process.env.BRAND_LOGO_FILE; // ruta local absoluta o relativa
-  const backendPublicLogo = path.resolve('public', 'logo.png'); // <- tu backend/public/logo.png
-  const logoUrlRaw = process.env.BRAND_LOGO_URL || '/logo.png'; // si es absoluta, se usa; si es relativa, se combina
+  const backendPublicLogo = path.resolve('public', 'logo.png'); // backend/public/logo.png
+  const logoUrlRaw = process.env.BRAND_LOGO_URL || '/logo.png';
+
+  const makeCidTag = () =>
+    `<img src="cid:brandLogo" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`;
 
   // 1) BRAND_LOGO_FILE → CID
   if (logoFileEnv) {
     const abs = path.isAbsolute(logoFileEnv) ? logoFileEnv : path.resolve(logoFileEnv);
     if (fs.existsSync(abs)) {
-      return {
-        htmlTag: `<img src="cid:brandLogo" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;">`,
-        attachment: { filename: path.basename(abs), path: abs, cid: 'brandLogo' }
-      };
+      return { htmlTag: makeCidTag(), attachment: { filename: path.basename(abs), path: abs, cid: 'brandLogo' } };
     }
   }
-
   // 2) backend/public/logo.png → CID
   if (fs.existsSync(backendPublicLogo)) {
-    return {
-      htmlTag: `<img src="cid:brandLogo" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;">`,
-      attachment: { filename: 'logo.png', path: backendPublicLogo, cid: 'brandLogo' }
-    };
+    return { htmlTag: makeCidTag(), attachment: { filename: 'logo.png', path: backendPublicLogo, cid: 'brandLogo' } };
   }
-
-  // 3) BRAND_LOGO_URL absoluta → <img src="https://...">
+  // 3) URL absoluta
   if (/^https?:\/\//i.test(logoUrlRaw)) {
-    return {
-      htmlTag: `<img src="${logoUrlRaw}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;">`,
-      attachment: null
-    };
+    return { htmlTag: `<img src="${logoUrlRaw}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`, attachment: null };
   }
-
   // 4) BACKEND_URL + /logo.png
   if (BACKEND_URL) {
     const url = `${BACKEND_URL}/logo.png`;
-    return {
-      htmlTag: `<img src="${url}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;">`,
-      attachment: null
-    };
+    return { htmlTag: `<img src="${url}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`, attachment: null };
   }
-
   // 5) FRONTEND_URL + /logo.png
   if (FRONTEND_URL) {
     const url = `${FRONTEND_URL}/logo.png`;
-    return {
-      htmlTag: `<img src="${url}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;">`,
-      attachment: null
-    };
+    return { htmlTag: `<img src="${url}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`, attachment: null };
   }
-
-  // Sin logo
   return { htmlTag: '', attachment: null };
 }
 
-/* ====== RENDER COMENTARIOS (timeline cards) ====== */
+/* ====== TIMELINE ====== */
 function resolveAuthorRole(entry = {}, ticket = {}) {
   const autor = (entry.autor || '').toLowerCase();
   const cliente = (ticket.usuario_id?.email || ticket.creadoPor || '').toLowerCase();
   const agente  = (ticket.asignadoA?.email || ticket.asignadoA || '').toLowerCase();
-
   if (autor && cliente && autor === cliente) return 'cliente';
   if (autor && agente && autor === agente) return 'agente';
   return 'otro';
 }
-
 function initials(email = '') {
   const base = (email.split('@')[0] || '').replace(/[^a-zA-Z0-9]/g, ' ').trim();
   const parts = base.split(/\s+/).filter(Boolean);
@@ -151,7 +121,6 @@ function initials(email = '') {
   const i2 = parts[1]?.[0] || '';
   return (i1 + i2).toUpperCase().slice(0, 2);
 }
-
 function renderCommentCard(entry, ticket, isLast = false) {
   const when = entry.fecha ? fmtDateTimeShort(new Date(entry.fecha)) : 'Fecha desconocida';
   const estado = esc(entry.estado || '');
@@ -201,7 +170,6 @@ function renderCommentCard(entry, ticket, isLast = false) {
     </div>
   `;
 }
-
 function isSameComment(a, b) {
   if (!a || !b) return false;
   const sameText = (a.comentario || '').trim() === (b.comentario || '').trim();
@@ -210,6 +178,30 @@ function isSameComment(a, b) {
   const tb = b.fecha ? new Date(b.fecha).getTime() : 0;
   const close = Math.abs(ta - tb) < 60 * 1000;
   return sameText && sameAuthor && close;
+}
+
+/* ====== SUBJECT + PREHEADER ====== */
+function composeSubject(accion, ticket) {
+  const numero = ticket.numero_ticket;
+  const asunto = (ticket.asunto || '').trim();
+  const base =
+    accion === 'crear'     ? ' Nuevo' :
+    accion === 'estado'    ? ' Actualizado' :
+    /* comentario */         ' Comentario';
+  return `${base} · Ticket #${numero}${asunto ? ` · ${asunto}` : ''}`;
+}
+
+function composePreheader(accion, ticket, ultimo) {
+  if (accion === 'comentario' && ultimo) {
+    const autor = ultimo.autor || 'Alguien';
+    const short = (ultimo.comentario || '').replace(/\s+/g,' ').slice(0, 80);
+    return `${autor}: ${short}`;
+  }
+  if (accion === 'estado') {
+    return `Estado: ${ticket.estado || 'N/A'} · Prioridad: ${ticket.prioridad || 'N/A'}`;
+  }
+  // crear
+  return `Creado por ${ticket.usuario_id?.email || 'usuario'} · Estado ${ticket.estado || 'N/A'}`;
 }
 
 /* =========================
@@ -237,11 +229,9 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
 
   const enlaceTicket = buildTicketLink(ticket);
 
-  const subjectPrefix =
-    accion === 'crear' ? 'Nuevo' :
-    accion === 'estado' ? 'Actualizado' :
-    'Comentario';
-  const subject = `${subjectPrefix} – Ticket #${numero} – ${ticket.asunto || ''}`.trim();
+  // Título y preheader
+  const subject = composeSubject(accion, ticket);
+  const preheaderText = composePreheader(accion, ticket, Array.isArray(ticket.historial) ? ticket.historial[ticket.historial.length - 1] : null);
 
   const labelAccion =
     accion === 'crear' ? 'Nuevo ticket' :
@@ -275,9 +265,9 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
     ? `<div style="margin-top:6px;color:#64748b;font-size:12px;">… Hay más actividad. Consulte el ticket para ver el historial completo.</div>`
     : '';
 
-  // Texto plano
+  // Texto plano (fallback)
   const textLines = [];
-  textLines.push(`${subjectPrefix} de ticket`);
+  textLines.push(subject);
   textLines.push(`Ticket #${numero}`);
   textLines.push('');
   if (accion === 'crear') {
@@ -308,45 +298,40 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
   const text = textLines.join('\n');
 
   // HTML
+  const preheader = esc(preheaderText || '');
+
   let html = `
-  <div style="font-family: Inter, Segoe UI, Roboto, Arial, sans-serif; background:#f8fafc; padding:24px; color:#0f172a;">
+  <div style="font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+    <!-- preheader (invisible) -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      ${preheader}
+    </div>
+
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px;border-bottom:1px solid #e5e7eb;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
             <tr>
-              <!-- Izquierda: logo + marca + acción + ticket -->
               <td valign="middle" style="padding:0;">
                 <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                   <tr>
-                    ${logoTag ? `<td valign="middle" style="padding:0; padding-right:12px;">${logoTag}</td>` : ``}
+                    ${logoTag ? `<td valign="middle" style="padding:0;padding-right:12px;">${logoTag}</td>` : ``}
                     <td valign="middle" style="padding:0;">
-                      <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1;">
-                        ${BRAND_NAME}
-                      </div>
-                      <div style="font-size:12px;color:#64748b;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;">
-                        ${labelAccion}
-                      </div>
-                      <div style="font-size:20px;font-weight:800;margin-top:4px;color:#0f172a;">
-                        Ticket #${numero}
-                      </div>
+                      <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1;">${BRAND_NAME}</div>
+                      <div style="font-size:12px;color:#64748b;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;">${labelAccion}</div>
+                      <div style="font-size:20px;font-weight:800;margin-top:4px;color:#0f172a;">Ticket #${numero}</div>
                     </td>
                   </tr>
                 </table>
               </td>
-              <!-- Derecha: chips -->
               <td valign="middle" align="right" style="padding:0;">
                 <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                   <tr>
                     <td style="padding-left:6px;">
-                      <span style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;background:#eef2ff;color:#3730a3;font-weight:700;">
-                        ${estado}
-                      </span>
+                      <span style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;background:#eef2ff;color:#3730a3;font-weight:700;">${estado}</span>
                     </td>
                     <td style="padding-left:6px;">
-                      <span style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;background:#fef3c7;color:#92400e;font-weight:700;">
-                        ${prioridad}
-                      </span>
+                      <span style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;background:#fef3c7;color:#92400e;font-weight:700;">${prioridad}</span>
                     </td>
                   </tr>
                 </table>
@@ -392,7 +377,7 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
           ${FRONTEND_URL ? `
             <div style="margin-top:18px;">
               <a href="${enlaceTicket}" target="_blank" rel="noopener noreferrer"
-                 style="display:inline-block;padding:12px 16px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:10px;font-weight:700;">
+                style="display:inline-block;padding:12px 16px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:10px;font-weight:700;">
                 Ver ticket
               </a>
             </div>
@@ -412,10 +397,12 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
 
   // Adjuntos (si existen en disco)
   const attachments = [];
+  // Imagen directa pasada por el controller (crear/comentario con imagen)
   if (imagenPath) {
     const full = path.resolve(imagenPath);
     if (fs.existsSync(full)) attachments.push({ filename: path.basename(full), path: full });
   }
+  // Imágenes presentes en historial
   if (Array.isArray(ticket.historial) && ticket.historial.length) {
     const names = new Set(ticket.historial.map(e => e.imagen).filter(Boolean));
     for (const name of names) {
@@ -425,14 +412,22 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
       }
     }
   }
-  // Adjuntar logo CID si corresponde
-  if (logoAttachment) attachments.push(logoAttachment);
+  // Logo CID si corresponde
+  const { attachment: _logoAgain } = buildLogoBlock(); // ya lo creamos arriba, pero por seguridad mantenemos uno
+  if (_logoAgain && !attachments.find(a => a.cid === 'brandLogo')) {
+    attachments.push(_logoAgain);
+  }
 
   const mailOptions = {
     from: `"${BRAND_NAME} – Sistema de Tickets" <${EMAIL_FROM}>`,
     to: Array.isArray(destinatarios) ? destinatarios.join(',') : destinatarios,
+    cc: MAIL_CC || undefined,
+    bcc: MAIL_BCC || undefined,
     subject,
-    headers: { 'X-Ticket-Id': String(numero) },
+    headers: {
+      'X-Ticket-Id': String(numero),
+      'List-Unsubscribe': `<mailto:${EMAIL_FROM}?subject=unsubscribe>`
+    },
     replyTo: process.env.NO_REPLY || EMAIL_FROM,
     text,
     html,

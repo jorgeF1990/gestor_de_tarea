@@ -1,621 +1,502 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
 import './Tickets.css';
 
-const STORAGE_KEY = 'tickets_view_prefs:v1';
-const SEEN_KEY = 'tickets_last_seen:v1';
-const OPEN_KEY = 'tickets_open_cards:v1';
+const API = import.meta.env.VITE_BACKEND_URL;
+const headers = (token) => ({ Authorization: `Bearer ${token}` });
 
-function Tickets() {
+const estadoOps = ['abierto','pendiente','en_proceso','resuelto','cerrado','reabierto','cancelado'];
+const prioOps = ['baja','media','alta'];
+
+/** Última actividad (ms) de un ticket */
+const getActivityTs = (t) => {
+  const created = t.createdAt || t.fecha_creacion;
+  const updated = t.updatedAt || t.fecha_actualizacion;
+  const lastHist = Array.isArray(t.historial) && t.historial.length
+    ? t.historial[t.historial.length - 1]?.fecha
+    : null;
+
+  const times = [
+    created ? new Date(created).getTime() : 0,
+    updated ? new Date(updated).getTime() : 0,
+    lastHist ? new Date(lastHist).getTime() : 0,
+  ];
+
+  return Math.max(...times.filter(Boolean)) || 0;
+};
+
+/** ISO del último movimiento relevante (comentario/actualización) */
+const lastISOFromTicket = (t) => {
+  const last = t.historial?.[t.historial.length - 1];
+  if (last?.fecha) return new Date(last.fecha).toISOString();
+  if (t.fecha_actualizacion) return new Date(t.fecha_actualizacion).toISOString();
+  return null;
+};
+
+export default function Tickets() {
   const [tickets, setTickets] = useState([]);
-  const [estadoFiltro, setEstadoFiltro] = useState('');
-  const [prioridadFiltro, setPrioridadFiltro] = useState('');
-  const [busqueda, setBusqueda] = useState('');
-  const [abiertos, setAbiertos] = useState({});
-  const [flashIds, setFlashIds] = useState({});
-  const [usuarioActual, setUsuarioActual] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Composer por ticket
-  const [drafts, setDrafts] = useState({}); // { [id]: { texto, archivo, previewUrl } }
+  // filtros
+  const [q, setQ] = useState('');
+  const [fEstado, setFEstado] = useState('');
+  const [fPrio, setFPrio] = useState('');
 
-  // Toasts
+  // sort -> por defecto: "actividad" desc
+  const [sort, setSort] = useState({ by: 'actividad', dir: 'desc' });
+
+  // paginado
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
+  // drawer
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState(null);
+
+  // comentario (solo comentar, sin cambiar estado/prioridad)
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ comentario:'', archivo:null });
+
+  // tema (CLARO por defecto)
+  const [theme, setTheme] = useState(() => localStorage.getItem('tickets-theme') || 'light');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+    localStorage.setItem('tickets-theme', theme);
+  }, [theme]);
+
+  const token = localStorage.getItem('token');
+
+  /* ======================
+     Novedades (polling + diff por ticket)
+     ====================== */
+  const [newsCount, setNewsCount] = useState(0);
+  const [changesMap, setChangesMap] = useState({}); // { id: {nuevo, comentario, estado, prioridad} }
   const [toasts, setToasts] = useState([]);
   const audioRef = useRef(null);
-  const navigate = useNavigate();
+  const SEEN_KEY = 'tickets_seen_snapshot:v1';
 
-  // Novedades (campana)
-  const [updates, setUpdates] = useState([]); // [{id, numero, asunto, changes: ['comentario','estado','prioridad']}]
-  const [panelOpen, setPanelOpen] = useState(false);
-
-  const showToast = (msg, type = 'info', ttl = 3000) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-    setToasts(prev => [...prev, { id, msg, type }]);
-    try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/notify.mp3');
-        audioRef.current.volume = 0.3;
-      }
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    } catch {}
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ttl);
+  const getSeen = () => {
+    try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch { return {}; }
   };
-
-  // 1) MONTAJE ÚNICO: restaurar prefs/abiertos + auth (sin dependencias)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const prefs = JSON.parse(raw);
-        if (typeof prefs.busqueda === 'string') setBusqueda(prefs.busqueda);
-        if (typeof prefs.estadoFiltro === 'string') setEstadoFiltro(prefs.estadoFiltro);
-        if (typeof prefs.prioridadFiltro === 'string') setPrioridadFiltro(prefs.prioridadFiltro);
-      }
-    } catch {}
-    try {
-      const rawOpen = localStorage.getItem(OPEN_KEY);
-      if (rawOpen) setAbiertos(JSON.parse(rawOpen) || {});
-    } catch {}
-
-    const token = localStorage.getItem('token');
-    if (!token) { navigate('/login'); return; }
-    try {
-      const payload = jwtDecode(token);
-      setUsuarioActual(payload.email || 'usuario');
-    } catch { setUsuarioActual('usuario'); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // MUY IMPORTANTE: vacío para evitar loops
-
-  // Persistir preferencias y abiertos (no generan loops)
-  useEffect(() => {
-    const prefs = { busqueda, estadoFiltro, prioridadFiltro };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch {}
-  }, [busqueda, estadoFiltro, prioridadFiltro]);
-
-  useEffect(() => {
-    try { localStorage.setItem(OPEN_KEY, JSON.stringify(abiertos)); } catch {}
-  }, [abiertos]);
-
-  // 2) cargarTickets memorizado: depende solo de filtros
-  const cargarTickets = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return navigate('/login');
-
-    const params = new URLSearchParams();
-    if (estadoFiltro) params.append('estado', estadoFiltro);
-    if (prioridadFiltro) params.append('prioridad', prioridadFiltro);
-
-    try {
-      const { data } = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/tickets?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      // Orden: tickets con novedades de otro primero
-      const ordenados = data.slice().sort((a, b) => {
-        const aNuevo = tieneComentarioNuevoDeOtro(a, usuarioActual);
-        const bNuevo = tieneComentarioNuevoDeOtro(b, usuarioActual);
-        if (aNuevo && !bNuevo) return -1;
-        if (!aNuevo && bNuevo) return 1;
-        return new Date(b.fecha_creacion) - new Date(a.fecha_creacion);
-      });
-
-      setTickets(ordenados);
-
-      // limpiar "abiertos" que ya no existan
-      setAbiertos(prev => {
-        const next = {};
-        const setIds = new Set(ordenados.map(t => t._id));
-        Object.entries(prev).forEach(([id, v]) => { if (setIds.has(id)) next[id] = v; });
-        return next;
-      });
-
-      // Novedades (excluye cambios del propio usuario)
-      calcularNovedades(ordenados, usuarioActual, setUpdates);
-    } catch (err) {
-      console.error(err);
-      showToast('No se pudieron cargar los tickets', 'error');
-      setTickets([]);
-      setUpdates([]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estadoFiltro, prioridadFiltro, usuarioActual]); // ok
-
-  // 3) disparar carga cuando cambian filtros o usuarioActual
-  useEffect(() => {
-    cargarTickets();
-  }, [cargarTickets]);
-
-  const marcarLeido = async (id) => {
-    const token = localStorage.getItem('token');
-    try {
-      await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/tickets/${id}/leido`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    } catch (err) {
-      console.error('Error al marcar leído:', err.response?.data || err.message);
-    }
+  const setSeen = (snap) => {
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(snap)); } catch {}
   };
-
-  const setOpenAndFocus = (id, open = true) => {
-    setAbiertos(prev => ({ ...prev, [id]: open }));
-    if (open) {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`ticket-${id}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          setFlashIds(prev => ({ ...prev, [id]: true }));
-          setTimeout(() => setFlashIds(prev => { const n = { ...prev }; delete n[id]; return n; }), 1300);
-        }
-      });
-      if (!abiertos[id]) marcarLeido(id);
-    }
-  };
-
-  const toggleTicket = (id) => setOpenAndFocus(id, !abiertos[id]);
-
-  //helpers de novedades (no auto-notificarse) 
-  const tieneComentarioNuevoDeOtro = (ticket, emailActual) => {
-    const ultimo = ticket.historial?.[ticket.historial.length - 1];
-    if (!ultimo) return false;
-    if (ultimo.autor === emailActual) return false; // no te notifiques a vos
-    const reg = ticket.leidoPor?.find(l => l.usuario === emailActual);
-    if (!reg) return true;
-    return new Date(ultimo.fecha) > new Date(reg.fecha);
-  };
-
-  const getSeenSnapshot = () => {
-    try {
-      const raw = localStorage.getItem(SEEN_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return {};
-  };
-
-  const buildCurrentSnapshot = (list) => {
+  const buildSnap = (list) => {
     const snap = {};
     for (const t of list) {
-      const last = t.historial?.[t.historial.length - 1];
-      const lastISO = last?.fecha ? new Date(last.fecha).toISOString() : null;
       snap[t._id] = {
+        lastISO: lastISOFromTicket(t),
         estado: t.estado || '',
-        prioridad: t.prioridad || '',
-        lastISO,
-        lastAutor: last?.autor || null,
+        prioridad: t.prioridad || ''
       };
     }
     return snap;
   };
 
-  const calcularNovedades = (list, emailActual, setUpdatesFn) => {
-    const seen = getSeenSnapshot();
-    const curr = buildCurrentSnapshot(list);
-    const cambios = [];
+  const computeChanges = (prev, curr, t) => {
+    const p = prev?.[t._id];
+    const c = curr?.[t._id];
+    const out = { nuevo:false, comentario:false, estado:false, prioridad:false };
 
-    for (const t of list) {
-      const prev = seen[t._id];
-      const now = curr[t._id];
-
-      // último autor (para excluir self)
-      const lastAutor = now.lastAutor;
-
-      if (!prev) {
-        const ch = [];
-        // sólo novedades si el último evento NO es del usuario actual
-        if (now.lastISO && lastAutor && lastAutor !== emailActual) ch.push('comentario');
-
-        // cambios de estado/prioridad: tomamos como señal el último evento también
-        if (lastAutor && lastAutor !== emailActual) {
-          if (now.estado) ch.push('estado');
-          if (now.prioridad) ch.push('prioridad');
-        }
-
-        if (ch.length) cambios.push({ id: t._id, numero: t.numero_ticket, asunto: t.asunto, changes: Array.from(new Set(ch)) });
-        continue;
-      }
-
-      const ch = [];
-
-      // comentario: si cambió lastISO y lo hizo otro
-      if ((prev.lastISO || '') !== (now.lastISO || '') && lastAutor && lastAutor !== emailActual) {
-        ch.push('comentario');
-      }
-
-      // estado/prioridad: si difieren y el último cambio fue de otro
-      if (prev.estado !== now.estado && lastAutor && lastAutor !== emailActual) ch.push('estado');
-      if (prev.prioridad !== now.prioridad && lastAutor && lastAutor !== emailActual) ch.push('prioridad');
-
-      if (ch.length) cambios.push({ id: t._id, numero: t.numero_ticket, asunto: t.asunto, changes: Array.from(new Set(ch)) });
+    if (!p) {
+      // Ticket nuevo para este usuario (sin snapshot previo)
+      out.nuevo = true;
+      // Si tiene historial, consideramos también comentario reciente
+      if (t.historial?.length) out.comentario = true;
+      return out;
     }
+    if ((p.lastISO || '') !== (c.lastISO || '')) out.comentario = true;
+    if (p.estado !== c.estado) out.estado = true;
+    if (p.prioridad !== c.prioridad) out.prioridad = true;
 
-    setUpdatesFn(cambios);
+    return out;
   };
 
-  const marcarTodoVisto = () => {
-    const snap = buildCurrentSnapshot(tickets);
-    try { localStorage.setItem(SEEN_KEY, JSON.stringify(snap)); } catch {}
-    setUpdates([]);
-    setPanelOpen(false);
-    showToast('Novedades marcadas como vistas', 'info');
-  };
-
-  const marcarUnoVisto = (id) => {
-    const seen = getSeenSnapshot();
-    const curr = buildCurrentSnapshot(tickets);
-    if (!curr[id]) return;
-    const next = { ...seen, [id]: curr[id] };
-    try { localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch {}
-    setUpdates(prev => {
-      const rest = prev.filter(u => u.id !== id);
-      if (rest.length === 0) setPanelOpen(false);
-      return rest;
-    });
-  };
-
-  // Buscar + filtrar
-  const ticketsFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    return tickets.filter(t => {
-      if (q) {
-        const numero = String(t.numero_ticket || '');
-        const asunto = String(t.asunto || '').toLowerCase();
-        const desc = String(t.descripcion || '').toLowerCase();
-        const email = String(t.usuario_id?.email || '').toLowerCase();
-        const estado = String(t.estado || '').toLowerCase();
-        const any = numero.includes(q) || asunto.includes(q) || desc.includes(q) || email.includes(q) || estado.includes(q);
-        if (!any) return false;
-      }
-      if (estadoFiltro && t.estado !== estadoFiltro) return false;
-      if (prioridadFiltro && t.prioridad !== prioridadFiltro) return false;
-      return true;
-    });
-  }, [tickets, busqueda, estadoFiltro, prioridadFiltro]);
-
-  // Draft helpers
-  const onDraft = (id, campo, valor) => setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [campo]: valor } }));
-
-  const handleImage = (id, file) => {
-    if (!file || !file.type?.startsWith('image/')) return;
-    const named = new File(
-      [file],
-      file.name && file.name !== 'blob' ? file.name : `captura-${Date.now()}.${file.type?.split('/')[1] || 'png'}`,
-      { type: file.type || 'image/png' }
-    );
-    setDrafts(prev => {
-      const prevItem = prev[id];
-      if (prevItem?.previewUrl) URL.revokeObjectURL(prevItem.previewUrl);
-      const previewUrl = URL.createObjectURL(named);
-      return { ...prev, [id]: { ...(prevItem || {}), archivo: named, previewUrl } };
-    });
-  };
-
-  const handlePasteAsFile = (id, e) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const blob = items[i].getAsFile();
-        const named = new File([blob], `captura-${Date.now()}.${blob?.type?.split('/')[1] || 'png'}`, { type: blob?.type || 'image/png' });
-        handleImage(id, named);
-      }
-    }
-  };
-
-  const limpiarAdjunto = (id) => {
-    setDrafts(prev => {
-      const next = { ...prev };
-      const curr = next[id];
-      if (curr?.previewUrl) URL.revokeObjectURL(curr.previewUrl);
-      if (next[id]) { delete next[id].archivo; delete next[id].previewUrl; }
-      return next;
-    });
-  };
-
-  const enviarComentario = async (ticketId) => {
-    const token = localStorage.getItem('token');
-    const d = drafts[ticketId] || {};
-    if (!d.texto && !d.archivo) { showToast('Escribí un comentario o adjuntá una imagen', 'info'); return; }
-
-    const formData = new FormData();
-    if (d.texto) formData.append('comentario', d.texto);
-    if (d.archivo) formData.append('imagen', d.archivo);
-
+  const showToast = (msg) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+    setToasts(prev => [...prev, { id, msg }]);
     try {
-      await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/tickets/${ticketId}/comentario`,
-        formData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setDrafts(prev => {
-        const next = { ...prev };
-        const curr = next[ticketId];
-        if (curr?.previewUrl) URL.revokeObjectURL(curr.previewUrl);
-        next[ticketId] = { texto: '', archivo: null, previewUrl: undefined };
-        return next;
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/notify.mp3');
+        audioRef.current.volume = 0.25;
+      }
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(()=>{});
+    } catch {}
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  };
+
+  const cargar = async (silent=false) => {
+    if (!silent) setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (fEstado) params.append('estado', fEstado);
+      if (fPrio) params.append('prioridad', fPrio);
+
+      const { data } = await axios.get(`${API}/tickets?${params.toString()}`, {
+        headers: headers(token),
       });
-      showToast('Comentario enviado', 'success');
-      await cargarTickets(); // recalcula novedades
-    } catch (err) {
-      console.error(err);
-      showToast('No se pudo enviar el comentario', 'error');
+
+      const ordered = (data || []).slice().sort((a,b) => getActivityTs(b) - getActivityTs(a));
+
+      // Diff por ticket
+      const prev = getSeen();
+      const curr = buildSnap(ordered);
+      const newChanges = {};
+      let changesCount = 0;
+
+      for (const t of ordered) {
+        const diff = computeChanges(prev, curr, t);
+        const anyChange = diff.nuevo || diff.comentario || diff.estado || diff.prioridad;
+        if (anyChange) {
+          newChanges[t._id] = diff;
+          changesCount++;
+        }
+      }
+
+      // Si es polling silencioso y hay cambios, mostramos toast y badge
+      if (changesCount > 0 && silent) {
+        setNewsCount(changesCount);
+        showToast(`🔔 ${changesCount} ticket(s) con novedades`);
+      }
+
+      setChangesMap(newChanges);
+      setTickets(ordered);
+    } catch {
+      setTickets([]);
+      setChangesMap({});
+    } finally {
+      if (!silent) setLoading(false);
     }
   };
 
-  const colorEstado = {
-    abierto: '#22c55e',
-    pendiente: '#e11d48',
-    en_proceso: '#f59e0b',
-    resuelto: '#10b981',
-    cerrado: '#64748b',
-    reabierto: '#fb923c',
-    cancelado: '#ef4444',
+  // carga inicial + filtros
+  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [fEstado, fPrio]);
+
+  // polling cada 20s (silencioso)
+  useEffect(() => {
+    const id = setInterval(() => cargar(true), 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  const confirmarVistos = () => {
+    const snap = buildSnap(tickets);
+    setSeen(snap);
+    setNewsCount(0);
+    setChangesMap({});
   };
 
-  const limpiarVista = () => {
-    setBusqueda(''); setEstadoFiltro(''); setPrioridadFiltro('');
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
-    showToast('Vista restablecida', 'info');
+  /* ======================
+     Búsqueda / orden / paginado
+     ====================== */
+  const filtered = useMemo(() => {
+    const text = q.trim().toLowerCase();
+    let arr = tickets.filter(t => {
+      if (!text) return true;
+      return (
+        (t.numero_ticket || '').toString().includes(text) ||
+        (t.asunto || '').toLowerCase().includes(text) ||
+        (t.descripcion || '').toLowerCase().includes(text) ||
+        (t.usuario_id?.email || '').toLowerCase().includes(text)
+      );
+    });
+
+    arr.sort((a, b) => {
+      const dir = sort.dir === 'asc' ? 1 : -1;
+
+      const va =
+        sort.by === 'actividad' ? getActivityTs(a) :
+        sort.by === 'createdAt' ? new Date(a.createdAt || a.fecha_creacion || 0).getTime() :
+        sort.by === 'estado' ? (a.estado || '') :
+        sort.by === 'prioridad' ? (a.prioridad || '') :
+        (a.numero_ticket || 0);
+
+      const vb =
+        sort.by === 'actividad' ? getActivityTs(b) :
+        sort.by === 'createdAt' ? new Date(b.createdAt || b.fecha_creacion || 0).getTime() :
+        sort.by === 'estado' ? (b.estado || '') :
+        sort.by === 'prioridad' ? (b.prioridad || '') :
+        (b.numero_ticket || 0);
+
+      if (va < vb) return -1 * dir;
+      if (va > vb) return  1 * dir;
+      return 0;
+    });
+
+    return arr;
+  }, [tickets, q, sort]);
+
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageData = filtered.slice((page-1)*pageSize, page*pageSize);
+
+  const toggleSort = (by) => {
+    setSort(s => s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: 'asc' });
+  };
+
+  /* ======================
+     Drawer / acciones (solo comentar)
+     ====================== */
+  const abrirDrawer = (t) => {
+    setCurrent(t);
+    setForm({ comentario: '', archivo: null });
+    setOpen(true);
+  };
+  const cerrarDrawer = () => {
+    setOpen(false);
+    setCurrent(null);
+    setForm({ comentario:'', archivo:null });
+  };
+
+  const guardarComentario = async () => {
+    if (!current) return;
+    if (!form.comentario && !form.archivo) return;
+
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      if (form.comentario) fd.append('comentario', form.comentario);
+      if (form.archivo) fd.append('imagen', form.archivo);
+      await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { headers: headers(token) });
+
+      await cargar();
+      cerrarDrawer();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const markRead = async (id) => {
+    try {
+      await axios.put(`${API}/tickets/${id}/leido`, {}, { headers: headers(token) });
+      await cargar(true);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
-    <div className="tickets--wrap">
-      <img src="/logo.png" alt="Logo" className="tickets--logo" />
-      <h1 className="tickets--title">Mis Tickets - Portfolio Investment</h1>
+    <div className="tks-wrap">
+      <div className="tks-card">
+        <div className="tks-head">
+          <h2 style={{margin:0}}>Tickets</h2>
 
-      <div className="tickets--toolbar">
-        <input
-          type="text"
-          className="tickets--search"
-          placeholder="Buscar por #, asunto, descripción, estado o email"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        <select value={estadoFiltro} onChange={e => setEstadoFiltro(e.target.value)}>
-          <option value="">Estado: todos</option>
-          <option value="abierto">Abierto</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="en_proceso">En proceso</option>
-          <option value="resuelto">Resuelto</option>
-          <option value="cerrado">Cerrado</option>
-          <option value="reabierto">Reabierto</option>
-          <option value="cancelado">Cancelado</option>
-        </select>
-        <select value={prioridadFiltro} onChange={e => setPrioridadFiltro(e.target.value)}>
-          <option value="">Prioridad: todas</option>
-          <option value="baja">Baja</option>
-          <option value="media">Media</option>
-          <option value="alta">Alta</option>
-        </select>
-      </div>
-
-      <div className="tickets--metaBar">
-        <span className="count">
-          Mostrando <strong>{ticketsFiltrados.length}</strong> de <strong>{tickets.length}</strong> tickets
-        </span>
-        <div className="metaBar__actions">
-          <button className="btn btn-ghost" onClick={limpiarVista}>Restablecer vista</button>
-
-          <div className="bell-wrap">
-            <button
-              className="bell-btn"
-              aria-label="Novedades"
-              onClick={() => setPanelOpen(p => !p)}
-              data-has-updates={updates.length > 0}
+          <div className="tks-tools">
+            {/* Toggle de tema */}
+            <select
+              className="tks-select"
+              value={theme}
+              onChange={(e)=>setTheme(e.target.value)}
+              title="Tema"
+              aria-label="Tema"
             >
-              🔔
-              {updates.length > 0 && <span className="bell-badge">{updates.length}</span>}
+              <option value="light">Tema claro</option>
+              <option value="dark">Tema oscuro</option>
+            </select>
+
+            <input
+              className="tks-search"
+              placeholder="Buscar nº, asunto, descripción o correo"
+              value={q}
+              onChange={(e)=>{ setQ(e.target.value); setPage(1); }}
+            />
+            <select className="tks-select" value={fEstado} onChange={e=>{setFEstado(e.target.value); setPage(1);}}>
+              <option value="">Todos los estados</option>
+              {estadoOps.map(op => <option key={op} value={op}>{op}</option>)}
+            </select>
+            <select className="tks-select" value={fPrio} onChange={e=>{setFPrio(e.target.value); setPage(1);}}>
+              <option value="">Todas las prioridades</option>
+              {prioOps.map(op => <option key={op} value={op}>{op}</option>)}
+            </select>
+
+            <button className="tks-btn ghost" onClick={()=>cargar()}>
+              {loading ? <span className="loader" /> : (
+                <>
+                  Refrescar
+                  {newsCount > 0 && <span className="tks-badge" style={{marginLeft:8}} title="Novedades">{newsCount}</span>}
+                </>
+              )}
             </button>
 
-            {panelOpen && (
-              <div className="bell-panel">
-                <div className="bell-panel__head">
-                  <strong>Novedades</strong>
-                  <button className="btn btn-secondary btn-xs" onClick={marcarTodoVisto}>Marcar todo como visto</button>
-                </div>
-                {updates.length === 0 ? (
-                  <div className="bell-empty">Sin novedades</div>
-                ) : (
-                  <ul className="bell-list">
-                    {updates.map(u => (
-                      <li
-                        key={u.id}
-                        className="bell-item"
-                        onClick={() => { setPanelOpen(false); setOpenAndFocus(u.id, true); }}
-                      >
-                        <div className="bell-title">
-                          <span className="muted">#{u.numero}</span> {u.asunto || 'Sin asunto'}
-                        </div>
-                        <div className="bell-tags">
-                          {u.changes.includes('comentario') && <span className="tag tag-green">Comentario</span>}
-                          {u.changes.includes('estado') && <span className="tag tag-blue">Estado</span>}
-                          {u.changes.includes('prioridad') && <span className="tag tag-amber">Prioridad</span>}
-                        </div>
-                        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}>
-                          <button
-                            className="btn btn-ghost btn-xs"
-                            onClick={(e) => { e.stopPropagation(); marcarUnoVisto(u.id); }}
-                            title="Marcar este ticket como visto"
-                          >
-                            Marcar como visto
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+            {newsCount > 0 && (
+              <button className="tks-btn" onClick={confirmarVistos} title="Marcar novedades como vistas">
+                Marcar visto
+              </button>
             )}
           </div>
         </div>
+
+        {/* Leyenda de chips */}
+        <div className="tks-legend">
+          <span className="chip chip-new">Nuevo</span>
+          <span className="chip chip-comment">Comentario</span>
+          <span className="chip chip-state">Estado</span>
+          <span className="chip chip-prio">Prioridad</span>
+        </div>
+
+        {loading && (
+          <div className="empty"><span className="loader" /> Cargando…</div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="empty">No hay resultados con los filtros actuales.</div>
+        )}
+
+        {!loading && filtered.length > 0 && (
+          <>
+            <table className="tks-table">
+              <thead className="tks-thead">
+                <tr>
+                  <th onClick={()=>toggleSort('numero_ticket')} style={{cursor:'pointer'}}>#</th>
+                  <th>Asunto</th>
+                  <th onClick={()=>toggleSort('estado')} style={{cursor:'pointer'}}>Estado</th>
+                  <th onClick={()=>toggleSort('prioridad')} style={{cursor:'pointer'}}>Prioridad</th>
+                  <th>Usuario</th>
+                  {/* El orden inicial es por “actividad” */}
+                  <th onClick={()=>toggleSort('createdAt')} style={{cursor:'pointer'}}>Creado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageData.map(t => {
+                  const ch = changesMap[t._id] || {};
+                  const rowIsNew = ch.nuevo || ch.comentario || ch.estado || ch.prioridad;
+                  return (
+                    <tr
+                      key={t._id}
+                      className={`tks-row ${rowIsNew ? 'row-new' : ''}`}
+                      onClick={() => { abrirDrawer(t); markRead(t._id); }}
+                    >
+                      <td style={{width:90}}><strong>#{t.numero_ticket}</strong></td>
+                      <td>
+                        <div style={{fontWeight:700, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+                          <span>{t.asunto || 'Sin asunto'}</span>
+                          {/* Chips de cambios */}
+                          {ch.nuevo && <span className="chip chip-new">Nuevo</span>}
+                          {ch.comentario && <span className="chip chip-comment">Comentario</span>}
+                          {ch.estado && <span className="chip chip-state">Estado</span>}
+                          {ch.prioridad && <span className="chip chip-prio">Prioridad</span>}
+                        </div>
+                        <div style={{color:'var(--muted)', fontSize:12}}>{(t.descripcion || '').slice(0,90)}</div>
+                      </td>
+                      <td style={{width:140}}><span className={`tks-status ${t.estado}`}>{t.estado}</span></td>
+                      <td style={{width:110}} className={`tks-prio ${t.prioridad}`}>{t.prioridad}</td>
+                      <td style={{width:220}}>{t.usuario_id?.email || '—'}</td>
+                      <td style={{width:160}}>{new Date(t.createdAt || t.fecha_creacion).toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="tks-pag">
+              <button className="tks-btn" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Anterior</button>
+              <span className="tks-badge">{page} / {pages}</span>
+              <button className="tks-btn" disabled={page>=pages} onClick={()=>setPage(p=>p+1)}>Siguiente</button>
+            </div>
+          </>
+        )}
       </div>
 
-      <ul className="tickets--list">
-        {ticketsFiltrados.length ? ticketsFiltrados.map(t => {
-          const abierto = !!abiertos[t._id];
-          const draft = drafts[t._id] || { texto: '', archivo: null, previewUrl: undefined };
-          const nuevoDeOtro = tieneComentarioNuevoDeOtro(t, usuarioActual);
+      {/* Drawer detalle: solo comentario/adjunto (sin estado/prioridad) */}
+      {open && <div className="backdrop" onClick={cerrarDrawer} />}
+      {open && current && (
+        <aside className="drawer" role="dialog" aria-modal="true">
+          <div className="drawer-head">
+            <div>
+              <div style={{fontWeight:800}}>Ticket #{current.numero_ticket}</div>
+              <div style={{color:'var(--muted)', fontSize:12}}>
+                {current.asunto || 'Sin asunto'} • {current.usuario_id?.email || '—'}
+              </div>
+            </div>
+            <button className="tks-btn ghost" onClick={cerrarDrawer}>Cerrar ✖</button>
+          </div>
 
-          return (
-            <li
-              key={t._id}
-              id={`ticket-${t._id}`}
-              className={`ticket ${nuevoDeOtro ? 'is-new' : ''} ${flashIds[t._id] ? 'flash' : ''}`}
-            >
-              <header className="ticket__head">
-                <div className="ticket__id">
-                  <strong>#{t.numero_ticket}</strong> {t.asunto ? `– ${t.asunto}` : ''}
-                </div>
-                <div className="ticket__status">
-                  <span
-                    className="chip chip--estado"
-                    style={{ backgroundColor: colorEstado[t.estado] || '#475569' }}
-                  >
-                    {t.estado.replace('_',' ')}
-                  </span>
-                  <span className={`chip chip--prio prio-${t.prioridad}`}>{t.prioridad}</span>
-                </div>
-                <button className="btn" onClick={() => toggleTicket(t._id)}>
-                  {abierto ? 'Cerrar' : 'Abrir'}
-                </button>
-              </header>
+          <div className="drawer-body">
+            {/* Info básica */}
+            <div className="tks-card" style={{padding:'10px', marginBottom:'10px'}}>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+                <div><span className="hint">Estado actual</span><div className={`tks-status ${current.estado}`} style={{display:'inline-block', marginTop:6}}>{current.estado}</div></div>
+                <div><span className="hint">Prioridad</span><div className={`tks-prio ${current.prioridad}`} style={{marginTop:6}}>{current.prioridad}</div></div>
+                <div><span className="hint">Creado</span><div style={{marginTop:6}}>{new Date(current.createdAt || current.fecha_creacion).toLocaleString()}</div></div>
+                <div><span className="hint">Usuario</span><div style={{marginTop:6}}>{current.usuario_id?.email || '—'}</div></div>
+              </div>
 
-              {!abierto && (
-                <div className="ticket__row">
-                  <span className="muted">
-                    Creado: {new Date(t.fecha_creacion).toLocaleString()}
-                  </span>
-                  {nuevoDeOtro && <span className="badge">🆕 comentario nuevo</span>}
+              {current.imagen && (
+                <div style={{marginTop:10}}>
+                  <span className="hint">Imagen del ticket</span>
+                  <div style={{marginTop:6}}>
+                    <a href={`${API}/uploads/${current.imagen}`} target="_blank" rel="noreferrer">
+                      <img src={`${API}/uploads/${current.imagen}`} alt="Adjunto" width="220" style={{border:'1px solid var(--border)', borderRadius:12}} />
+                    </a>
+                  </div>
                 </div>
               )}
+            </div>
 
-              {abierto && (
-                <div className="ticket__body">
-                  <div className="meta">
-                    <div><strong>Creado:</strong> {new Date(t.fecha_creacion).toLocaleString()}</div>
-                    {t.usuario_id?.email && <div><strong>Tu email:</strong> {t.usuario_id.email}</div>}
-                  </div>
+            {/* Comentario + adjunto */}
+            <div className="tks-card" style={{padding:'10px', marginBottom:'10px'}}>
+              <div style={{fontWeight:700, marginBottom:8}}>Agregar comentario</div>
+              <div style={{marginTop:0}}>
+                <label className="hint">Comentario</label>
+                <textarea
+                  className="textarea"
+                  placeholder="Escribí un comentario (podés adjuntar imagen abajo)…"
+                  value={form.comentario}
+                  onChange={e=>setForm(f=>({...f, comentario:e.target.value}))}
+                />
+              </div>
+              <div style={{marginTop:10, display:'grid', gap:8}}>
+                <label className="hint">Adjuntar imagen</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="input"
+                  onChange={(e)=>setForm(f=>({...f, archivo:e.target.files?.[0] || null}))}
+                />
+                {form.archivo && <span className="hint">Seleccionado: {form.archivo.name}</span>}
+              </div>
+            </div>
 
-                  {t.descripcion && <p className="desc"><strong>Descripción:</strong> {t.descripcion}</p>}
-
-                  {t.imagen && (
-                    <div className="block">
-                      <p className="label">Imagen del ticket</p>
-                      <a
-                        href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${t.imagen}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${t.imagen}`}
-                          alt="Adjunto"
-                          width="220"
-                          className="img"
-                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://via.placeholder.com/220?text=No+disponible'; }}
-                        />
-                      </a>
-                    </div>
-                  )}
-
-                  {t.historial?.length > 0 && (
-                    <div className="block">
-                      <p className="label">Seguimiento</p>
-                      <ul className="timeline">
-                        {t.historial.map((h, i) => (
-                          <li key={i} className={h.autor && h.autor !== usuarioActual ? 'from-other' : ''}>
-                            <div className="timeline__line" />
-                            <div className="timeline__dot" />
-                            <div className="timeline__content">
-                              <div className="timeline__meta">
-                                <strong>{new Date(h.fecha).toLocaleString()}</strong> — {h.estado}
-                                {h.autor && <span className="muted"> ({h.autor})</span>}
-                              </div>
-                              {h.comentario && <div>{h.comentario}</div>}
-                              {h.imagen && (
-                                <a
-                                  href={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <img
-                                    src={`${import.meta.env.VITE_BACKEND_URL}/uploads/${h.imagen}`}
-                                    alt="Adjunto"
-                                    width="180"
-                                    className="img img--small"
-                                  />
-                                </a>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Composer */}
-                  <div className="composer">
-                    <label className="label">Agregar comentario</label>
-                    <textarea
-                      className="textarea"
-                      placeholder="Escribí tu comentario… (podés pegar una captura con Ctrl+V)"
-                      value={draft.texto || ''}
-                      onChange={(e) => onDraft(t._id, 'texto', e.target.value)}
-                      onPaste={(e) => handlePasteAsFile(t._id, e)}
-                      rows={3}
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck={false}
-                    />
-                    <div
-                      className="dropzone"
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; handleImage(t._id, file); }}
-                      onPaste={(e) => handlePasteAsFile(t._id, e)}
-                    >
-                      <input
-                        id={`file-${t._id}`}
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={(e) => handleImage(t._id, e.target.files?.[0])}
-                      />
-                      <label htmlFor={`file-${t._id}`} className="btn btn-secondary">Adjuntar imagen</label>
-                      {draft.archivo && <span className="file-name">{draft.archivo.name}</span>}
-                      {(draft.archivo || draft.previewUrl) && (
-                        <button className="btn btn-ghost" type="button" onClick={() => limpiarAdjunto(t._id)}>Quitar</button>
+            {/* Timeline */}
+            <div className="tks-card" style={{padding:'10px'}}>
+              <div style={{fontWeight:800, marginBottom:8}}>Actividad</div>
+              {current.historial?.length ? (
+                <ul className="timeline">
+                  {current.historial.slice().reverse().map((h, idx) => (
+                    <li key={idx}>
+                      <time>{new Date(h.fecha).toLocaleString()} • {h.autor || 'sistema'}</time>
+                      <div><strong>{h.estado}</strong>: {h.comentario}</div>
+                      {h.imagen && (
+                        <div style={{marginTop:6}}>
+                          <a href={`${API}/uploads/${h.imagen}`} target="_blank" rel="noreferrer">
+                            <img src={`${API}/uploads/${h.imagen}`} alt="Adjunto" width="180" style={{border:'1px solid var(--border)', borderRadius:10}} />
+                          </a>
+                        </div>
                       )}
-                    </div>
-
-                    {draft.previewUrl && (
-                      <div className="preview">
-                        <img src={draft.previewUrl} alt="Preview" className="img" />
-                      </div>
-                    )}
-
-                    <div className="composer__footer">
-                      <button className="btn" onClick={() => enviarComentario(t._id)} disabled={!draft.texto && !draft.archivo}>
-                        Enviar comentario
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="empty">Sin actividad</div>
               )}
-            </li>
-          );
-        }) : (
-          <li className="empty">No se encontraron tickets con los filtros actuales.</li>
-        )}
-      </ul>
+            </div>
+          </div>
 
-      {/* Toasts */}
+          <div className="drawer-foot">
+            <button className="tks-btn ghost" onClick={cerrarDrawer}>Cancelar</button>
+            <button className="tks-btn" onClick={guardarComentario} disabled={saving}>
+              {saving ? <span className="loader" /> : 'Guardar comentario'}
+            </button>
+          </div>
+        </aside>
+      )}
+
+      {/* Toasts de novedades */}
       <div className="toast-wrap">
         {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type}`}>
-            <div className="toast-icon">
-              {t.type === 'success' ? '✅' : t.type === 'error' ? '⛔' : 'ℹ️'}
-            </div>
+          <div key={t.id} className="toast info">
+            <div className="toast-icon">🔔</div>
             <div className="toast-msg">{t.msg}</div>
             <button className="toast-close" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>✖</button>
           </div>
@@ -624,5 +505,3 @@ function Tickets() {
     </div>
   );
 }
-
-export default Tickets;

@@ -99,16 +99,13 @@ export default function Tickets() {
     const out = { nuevo:false, comentario:false, estado:false, prioridad:false };
 
     if (!p) {
-      // Ticket nuevo para este usuario (sin snapshot previo)
       out.nuevo = true;
-      // Si tiene historial, consideramos también comentario reciente
       if (t.historial?.length) out.comentario = true;
       return out;
     }
     if ((p.lastISO || '') !== (c.lastISO || '')) out.comentario = true;
     if (p.estado !== c.estado) out.estado = true;
     if (p.prioridad !== c.prioridad) out.prioridad = true;
-
     return out;
   };
 
@@ -186,6 +183,30 @@ export default function Tickets() {
     setChangesMap({});
   };
 
+  /* ========= NUEVO: marcado optimista al abrir ========= */
+  const markAsSeenLocal = (ticket) => {
+    // 1) quitar chips de ese ticket en UI
+    setChangesMap(prev => {
+      if (!prev[ticket._id]) return prev;
+      const n = { ...prev };
+      delete n[ticket._id];
+      return n;
+    });
+    // 2) bajar el badge de novedades
+    setNewsCount(n => Math.max(0, n - 1));
+    // 3) actualizar snapshot localStorage para ese ticket
+    const prevSnap = getSeen();
+    const nextSnap = {
+      ...prevSnap,
+      [ticket._id]: {
+        lastISO: lastISOFromTicket(ticket),
+        estado: ticket.estado || '',
+        prioridad: ticket.prioridad || ''
+      }
+    };
+    setSeen(nextSnap);
+  };
+
   /* ======================
      Búsqueda / orden / paginado
      ====================== */
@@ -237,10 +258,16 @@ export default function Tickets() {
      Drawer / acciones (solo comentar)
      ====================== */
   const abrirDrawer = (t) => {
+    // ⬅️ marcado optimista INMEDIATO
+    markAsSeenLocal(t);
+    // enviar al backend el "leído", sin romper la UX
+    markRead(t._id);
+
     setCurrent(t);
     setForm({ comentario: '', archivo: null });
     setOpen(true);
   };
+
   const cerrarDrawer = () => {
     setOpen(false);
     setCurrent(null);
@@ -270,7 +297,7 @@ export default function Tickets() {
   const markRead = async (id) => {
     try {
       await axios.put(`${API}/tickets/${id}/leido`, {}, { headers: headers(token) });
-      await cargar(true);
+      // no recargamos aquí para no “reaparecer” chips; el polling/cargar los ajustará si hay nuevas novedades reales
     } catch (e) {
       console.error(e);
     }
@@ -310,6 +337,7 @@ export default function Tickets() {
               {prioOps.map(op => <option key={op} value={op}>{op}</option>)}
             </select>
 
+            {/* Si querés ocultar este botón, simplemente borralo */}
             <button className="tks-btn ghost" onClick={()=>cargar()}>
               {loading ? <span className="loader" /> : (
                 <>
@@ -365,7 +393,7 @@ export default function Tickets() {
                     <tr
                       key={t._id}
                       className={`tks-row ${rowIsNew ? 'row-new' : ''}`}
-                      onClick={() => { abrirDrawer(t); markRead(t._id); }}
+                      onClick={() => abrirDrawer(t)}
                     >
                       <td style={{width:90}}><strong>#{t.numero_ticket}</strong></td>
                       <td>

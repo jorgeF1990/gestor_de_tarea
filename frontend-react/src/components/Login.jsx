@@ -1,3 +1,4 @@
+// src/components/Login.jsx
 import React, { useContext, useState } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
@@ -5,11 +6,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import './Auth.css';
 
-const API = import.meta.env.VITE_BACKEND_URL;
+const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
 
 function Login() {
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext); // ← usamos el contexto
+  const { login } = useContext(AuthContext);
+
   const [email, setEmail] = useState('');
   const [pass, setPass]   = useState('');
   const [show, setShow]   = useState(false);
@@ -17,38 +19,47 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
+  const canSubmit = email.trim() && pass.trim() && !loading;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg({ type:'', text:'' });
 
-    if (!email.trim() || !pass.trim()) {
+    const emailClean = email.trim();
+    const passClean  = pass.trim();
+    if (!emailClean || !passClean) {
       setMsg({ type:'err', text:'Ingresá tu correo y contraseña.' });
       return;
     }
 
     try {
       setLoading(true);
-      const { data } = await axios.post(`${API}/auth/login`, { email, password: pass });
+      const { data } = await axios.post(`${API}/auth/login`, { email: emailClean, password: passClean });
 
       if (!data?.token) {
         setMsg({ type:'err', text:'Respuesta inválida del servidor.' });
         return;
       }
 
-      // 🔑 Guardar token en el contexto (esto dispara re-render global)
+      // Guarda token vía contexto (dispara re-render global)
       await login(data.token, { remember });
 
-      // (opcional) si querés seguir usando decode para alguna lógica local
-      try {
-        jwtDecode(data.token);
-      } catch {}
+      // opcional: decode si necesitás algo local
+      try { jwtDecode(data.token); } catch {}
 
-      // 🧭 Ir al Home YA logueado (tu Home ya muestra crear ticket si hay user)
+      // Volver al Home (ya logueado)
       navigate('/');
-
     } catch (err) {
-      const text = err.response?.data?.error || 'No se pudo iniciar sesión.';
-      setMsg({ type:'err', text });
+      // Si hay 404, pista típica: ruta mal montada (/auth/auth/login)
+      if (err?.response?.status === 404) {
+        setMsg({
+          type:'err',
+          text:`No se encontró la ruta de login. Verificá que el backend exponga POST ${API}/auth/login`
+        });
+      } else {
+        const text = err.response?.data?.error || 'No se pudo iniciar sesión.';
+        setMsg({ type:'err', text });
+      }
     } finally {
       setLoading(false);
     }
@@ -67,17 +78,23 @@ function Login() {
 
         {msg.text && <div className={`auth-msg ${msg.type}`}>{msg.text}</div>}
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-row">
             <label className="auth-label" htmlFor="email">Correo</label>
             <input
               id="email"
+              name="email"
               type="email"
               className="auth-input"
               placeholder="nombre@empresa.com"
               value={email}
               onChange={e=>setEmail(e.target.value)}
               autoFocus
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              required
             />
           </div>
 
@@ -86,11 +103,15 @@ function Login() {
             <div className="input-wrap">
               <input
                 id="pass"
+                name="password"
                 type={show ? 'text' : 'password'}
                 className="auth-input"
                 placeholder="••••••••"
                 value={pass}
                 onChange={e=>setPass(e.target.value)}
+                autoComplete="current-password"
+                required
+                minLength={6}
               />
               <button
                 type="button"
@@ -106,13 +127,17 @@ function Login() {
 
           <div className="auth-row inline">
             <label style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e=>setRemember(e.target.checked)}
+              />
               Recordarme
             </label>
             <Link className="auth-link" to="/recuperar">¿Olvidaste la contraseña?</Link>
           </div>
 
-          <button className="auth-btn" type="submit" disabled={loading}>
+          <button className="auth-btn" type="submit" disabled={!canSubmit}>
             {loading ? <span className="loader" /> : 'Ingresar'}
           </button>
         </form>

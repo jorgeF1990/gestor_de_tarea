@@ -16,7 +16,7 @@ import {
 import { Bar, Doughnut, Pie, Line } from "react-chartjs-2";
 import "./StatsPage.css";
 
-// ⬇️ Agregados para PDF
+// PDF / Print
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -37,24 +37,30 @@ ChartJS.register(
 const guessAuthor = (t) =>
   t.creador || t.usuario || t.cliente || t.createdBy || t.autor || t?.usuario_id?.email || "desconocido";
 
-const guessType = (t) => t.tipo || t.categoria || t.category || "sin_tipo";
+const guessType = (t) => {
+  // Heurística por palabras clave si no hay tipo/categoria
+  const direct = t.tipo || t.categoria || t.category;
+  if (direct) return direct;
+
+  const s = `${t.asunto || ""} ${t.descripcion || ""}`.toLowerCase();
+  if (/login|acceso|clave|password/.test(s)) return "acceso";
+  if (/email|correo|smtp|outlook|gmail/.test(s)) return "correo";
+  if (/impresora|printer|toner/.test(s)) return "impresoras";
+  if (/red|wifi|vpn|internet/.test(s)) return "red";
+  if (/erp|sistema|app|bug|error/.test(s)) return "sistemas";
+  if (/hardware|pc|computadora|notebook/.test(s)) return "hardware";
+  return "sin_tipo";
+};
 
 const guessState = (t) => (t.estado || "").toString().toLowerCase() || "sin_estado";
-
 const guessPriority = (t) => (t.prioridad || t.priority || "sin_prioridad").toString().toLowerCase();
-
 const guessCreatedAt = (t) => t.historial?.[0]?.fecha || t.createdAt || t.created_at || t.fecha_creacion || null;
-
 const guessResolvedAt = (t) => t.resolvedAt || t.fecha_cierre || null;
-
 const guessFirstResponseAt = (t) => t.firstResponseAt || t.primera_respuesta || null;
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-
 const toDayKey = (d) => new Date(d).toISOString().slice(0, 10);
-
 const weekdays = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-
 const formatHours = (ms) => {
   if (!ms || ms <= 0) return "—";
   const h = ms / 36e5;
@@ -79,10 +85,56 @@ const colorByEstado = {
 };
 
 /* ========= SLA Targets (en horas) ========= */
-const SLA_FIRST_RESPONSE_H =
-  Number(import.meta.env.VITE_SLA_FIRST_RESPONSE_H || 4);
-const SLA_RESOLUTION_H =
-  Number(import.meta.env.VITE_SLA_RESOLUTION_H || 48);
+const SLA_FIRST_RESPONSE_H = Number(import.meta.env.VITE_SLA_FIRST_RESPONSE_H || 4);
+const SLA_RESOLUTION_H     = Number(import.meta.env.VITE_SLA_RESOLUTION_H || 48);
+
+/* ========= Inferencias robustas desde historial ========= */
+const resolvedStates = new Set(["resuelto", "cerrado"]);
+
+const earliestHistDate = (t) => {
+  if (!Array.isArray(t.historial) || !t.historial.length) return null;
+  const h = t.historial.slice().sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  return h[0]?.fecha || null;
+};
+const latestHistDate = (t) => {
+  if (!Array.isArray(t.historial) || !t.historial.length) return null;
+  const h = t.historial.slice().sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  return h[h.length-1]?.fecha || null;
+};
+const guessCreatorEmail = (t) =>
+  (t.usuario_id?.email || t.creadoPor || t.creador || t.usuario || "").toString().toLowerCase();
+
+const inferCreatedAt = (t) =>
+  guessCreatedAt(t) || earliestHistDate(t);
+
+const inferFirstResponseAt = (t) => {
+  const explicit = guessFirstResponseAt(t);
+  if (explicit) return explicit;
+
+  if (!Array.isArray(t.historial) || !t.historial.length) return null;
+  const creator = guessCreatorEmail(t);
+  const h = t.historial.slice().sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  const firstReply = h.find(x => {
+    const autor = (x.autor || "").toString().toLowerCase();
+    if (!autor) return false;
+    return autor !== creator;
+  });
+  return firstReply?.fecha || null;
+};
+
+const inferResolvedAt = (t) => {
+  const explicit = guessResolvedAt(t);
+  if (explicit) return explicit;
+
+  if (Array.isArray(t.historial) && t.historial.length) {
+    const h = t.historial.slice().sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    const firstResolved = h.find(x => resolvedStates.has(String(x.estado || "").toLowerCase()));
+    if (firstResolved?.fecha) return firstResolved.fecha;
+  }
+  const estadoFinal = String(t.estado || "").toLowerCase();
+  if (resolvedStates.has(estadoFinal)) return latestHistDate(t);
+  return null;
+};
 
 export default function StatsPage({ tickets: propTickets }) {
   const [tickets, setTickets] = useState(propTickets || []);
@@ -91,9 +143,9 @@ export default function StatsPage({ tickets: propTickets }) {
   // Filtros de periodo
   const [preset, setPreset] = useState("30"); // "7" | "30" | "90" | "custom"
   const [start, setStart] = useState(""); // YYYY-MM-DD
-  const [end, setEnd] = useState(""); // YYYY-MM-DD
+  const [end, setEnd] = useState("");     // YYYY-MM-DD
 
-  // ⬇️ Ref del contenedor a exportar
+  // Ref del contenedor a exportar
   const statsRef = useRef(null);
 
   /* ====== Carga (si no viene por props) ====== */
@@ -115,9 +167,7 @@ export default function StatsPage({ tickets: propTickets }) {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [propTickets]);
 
   /* ====== Determinar rango de fechas ====== */
@@ -148,7 +198,7 @@ export default function StatsPage({ tickets: propTickets }) {
   const filtered = useMemo(() => {
     if (!tickets?.length) return [];
     return tickets.filter((t) => {
-      const created = guessCreatedAt(t);
+      const created = inferCreatedAt(t);
       return created && inRange(created);
     });
   }, [tickets, inRange]);
@@ -168,6 +218,8 @@ export default function StatsPage({ tickets: propTickets }) {
     totals,
     dailyAvgFirstResponse,
     dailyAvgResolution,
+    countFirstResponse,
+    countResolution,
   } = useMemo(() => {
     const byState = {};
     const byType = {};
@@ -187,17 +239,17 @@ export default function StatsPage({ tickets: propTickets }) {
     const rsDailyCount = {};
 
     filtered.forEach((t) => {
-      const st = guessState(t) || "sin_estado";
-      const ty = guessType(t) || "sin_tipo";
+      const st   = guessState(t) || "sin_estado";
+      const ty   = guessType(t) || "sin_tipo";
       const user = guessAuthor(t) || "desconocido";
-      const pr = guessPriority(t);
+      const pr   = guessPriority(t);
 
-      byState[st] = (byState[st] || 0) + 1;
-      byType[ty] = (byType[ty] || 0) + 1;
-      byUser[user] = (byUser[user] || 0) + 1;
+      byState[st]    = (byState[st]    || 0) + 1;
+      byType[ty]     = (byType[ty]     || 0) + 1;
+      byUser[user]   = (byUser[user]   || 0) + 1;
       byPriority[pr] = (byPriority[pr] || 0) + 1;
 
-      const created = guessCreatedAt(t);
+      const created = inferCreatedAt(t);
       if (created) {
         const d = new Date(created);
         if (!Number.isNaN(d.getTime())) {
@@ -211,19 +263,19 @@ export default function StatsPage({ tickets: propTickets }) {
         }
       }
 
-      const fr = guessFirstResponseAt(t);
+      const fr = inferFirstResponseAt(t);
       if (fr && created) {
         const diff = new Date(fr) - new Date(created);
         if (diff > 0) {
           totalFirstResponse += diff;
           countFirstResponse++;
           const k = toDayKey(created);
-          frDailySum[k] = (frDailySum[k] || 0) + diff;
+          frDailySum[k]   = (frDailySum[k]   || 0) + diff;
           frDailyCount[k] = (frDailyCount[k] || 0) + 1;
         }
       }
 
-      const rs = guessResolvedAt(t);
+      const rs = inferResolvedAt(t);
       if (rs && created) {
         const diff = new Date(rs) - new Date(created);
         if (diff > 0) {
@@ -234,7 +286,7 @@ export default function StatsPage({ tickets: propTickets }) {
           if (interactions <= 1) resolvedAtFirstContact++;
 
           const k = toDayKey(created);
-          rsDailySum[k] = (rsDailySum[k] || 0) + diff;
+          rsDailySum[k]   = (rsDailySum[k]   || 0) + diff;
           rsDailyCount[k] = (rsDailyCount[k] || 0) + 1;
         }
       }
@@ -242,14 +294,14 @@ export default function StatsPage({ tickets: propTickets }) {
 
     const totals = {
       total: filtered.length,
-      abiertos: byState.abierto || 0,
-      pendientes: byState.pendiente || 0,
-      enProceso: byState.en_proceso || 0,
-      resueltos: byState.resuelto || 0,
+      abiertos:  byState.abierto   || 0,
+      pendientes:byState.pendiente || 0,
+      enProceso: byState.en_proceso|| 0,
+      resueltos: byState.resuelto  || 0,
     };
 
     const dailyAvgFirstResponse = {};
-    const dailyAvgResolution = {};
+    const dailyAvgResolution   = {};
     Object.keys(frDailySum).forEach((k) => {
       dailyAvgFirstResponse[k] = frDailySum[k] / (frDailyCount[k] || 1);
     });
@@ -266,17 +318,19 @@ export default function StatsPage({ tickets: propTickets }) {
       stackedPerDay,
       byWeekday,
       avgFirstResponse: countFirstResponse ? totalFirstResponse / countFirstResponse : 0,
-      avgResolution: countResolution ? totalResolution / countResolution : 0,
+      avgResolution:    countResolution    ? totalResolution    / countResolution    : 0,
       firstContactResolution: totalResolved ? (resolvedAtFirstContact / totalResolved) * 100 : 0,
       totals,
       dailyAvgFirstResponse,
       dailyAvgResolution,
+      countFirstResponse,
+      countResolution,
     };
   }, [filtered]);
 
   /* ====== Arrays ordenados para gráficas ====== */
   const dayKeysSorted = useMemo(() => Object.keys(perDay).sort(), [perDay]);
-  const perDayCounts = useMemo(() => dayKeysSorted.map((k) => perDay[k]), [dayKeysSorted, perDay]);
+  const perDayCounts  = useMemo(() => dayKeysSorted.map((k) => perDay[k]), [dayKeysSorted, perDay]);
 
   const estadosPresentes = useMemo(() => {
     const set = new Set();
@@ -311,22 +365,10 @@ export default function StatsPage({ tickets: propTickets }) {
   const weekdayLabels = weekdays;
   const weekdayCounts = weekdays.map((_, i) => byWeekday[i] || 0);
 
-  const frDailyLabels = useMemo(
-    () => Object.keys(dailyAvgFirstResponse).sort(),
-    [dailyAvgFirstResponse]
-  );
-  const frDailyHours = useMemo(
-    () => frDailyLabels.map((k) => (dailyAvgFirstResponse[k] || 0) / 36e5),
-    [frDailyLabels, dailyAvgFirstResponse]
-  );
-  const rsDailyLabels = useMemo(
-    () => Object.keys(dailyAvgResolution).sort(),
-    [dailyAvgResolution]
-  );
-  const rsDailyHours = useMemo(
-    () => rsDailyLabels.map((k) => (dailyAvgResolution[k] || 0) / 36e5),
-    [rsDailyLabels, dailyAvgResolution]
-  );
+  const frDailyLabels = useMemo(() => Object.keys(dailyAvgFirstResponse).sort(), [dailyAvgFirstResponse]);
+  const frDailyHours  = useMemo(() => frDailyLabels.map((k) => (dailyAvgFirstResponse[k] || 0) / 36e5), [frDailyLabels, dailyAvgFirstResponse]);
+  const rsDailyLabels = useMemo(() => Object.keys(dailyAvgResolution).sort(), [dailyAvgResolution]);
+  const rsDailyHours  = useMemo(() => rsDailyLabels.map((k) => (dailyAvgResolution[k] || 0) / 36e5), [rsDailyLabels, dailyAvgResolution]);
 
   /* ====== CSV export: tickets ====== */
   const exportCSV = () => {
@@ -336,9 +378,9 @@ export default function StatsPage({ tickets: propTickets }) {
       "t_first_response_h","t_resolution_h","tipo",
     ];
     const rows = filtered.map((t) => {
-      const created = guessCreatedAt(t);
-      const fr = guessFirstResponseAt(t);
-      const rs = guessResolvedAt(t);
+      const created = inferCreatedAt(t);
+      const fr = inferFirstResponseAt(t);
+      const rs = inferResolvedAt(t);
       const diffFR = fr && created ? (new Date(fr) - new Date(created)) / 36e5 : "";
       const diffRS = rs && created ? (new Date(rs) - new Date(created)) / 36e5 : "";
       return [
@@ -402,11 +444,9 @@ export default function StatsPage({ tickets: propTickets }) {
   /* ====== Exportar PDF (multipágina, alta resolución) ====== */
   const exportPDF = async () => {
     if (!statsRef.current) return;
-    // Forzamos scroll top para evitar “lazy” / placeholders
     window.scrollTo(0, 0);
 
     const node = statsRef.current;
-    // Doble escala para mejor nitidez
     const scale = 2;
 
     const canvas = await html2canvas(node, {
@@ -442,9 +482,7 @@ export default function StatsPage({ tickets: propTickets }) {
   };
 
   /* ====== Imprimir (vista limpia) ====== */
-  const printPage = () => {
-    window.print();
-  };
+  const printPage = () => window.print();
 
   /* ====== Loading ====== */
   if (loading) return <div className="stats-loading">Cargando estadísticas…</div>;
@@ -469,20 +507,11 @@ export default function StatsPage({ tickets: propTickets }) {
 
           {preset === "custom" && (
             <>
-              <input
-                type="date"
-                className="input"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-              />
-              <input
-                type="date"
-                className="input"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
+              <input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} />
+              <input type="date" className="input" value={end} onChange={(e) => setEnd(e.target.value)} />
             </>
           )}
+
           <div className="range-hint">
             Rango activo: <strong>{rangeStart}</strong> → <strong>{rangeEnd}</strong>
           </div>
@@ -490,7 +519,6 @@ export default function StatsPage({ tickets: propTickets }) {
           <div className="actions">
             <button className="btn" onClick={exportCSV}>Exportar CSV</button>
             <button className="btn btn-secondary" onClick={exportAggregatesCSV}>Exportar métricas</button>
-            {/* ⬇️ Nuevos */}
             <button className="btn btn-outline" onClick={exportPDF}>Exportar PDF</button>
             <button className="btn btn-outline" onClick={printPage}>Imprimir</button>
           </div>
@@ -509,7 +537,6 @@ export default function StatsPage({ tickets: propTickets }) {
         <div className="kpi"><div className="kpi-title">Resolución</div><div className="kpi-value">{formatHours(avgResolution)}</div></div>
       </div>
 
-      {/* Gráficos… (todo igual que tu versión previa) */}
       {/* Tickets por día */}
       <div className="charts-row">
         <div className="chart-card wide avoid-break">
@@ -614,34 +641,42 @@ export default function StatsPage({ tickets: propTickets }) {
           />
         </div>
 
-        <div className="chart-card avoid-break">
-          <div className="card-title">Tickets por prioridad</div>
-          <Pie
-            data={{
-              labels: prioLabels,
-              datasets: [{ data: prioCounts, backgroundColor: prioLabels.map((_, i) => PALETTE[i % PALETTE.length]) }],
-            }}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: "right" },
-                tooltip: {
-                  callbacks: {
-                    label(ctx) {
-                      const total = prioCounts.reduce((a, b) => a + b, 0);
-                      const val = ctx.parsed;
-                      const pct = total ? ((val / total) * 100).toFixed(1) : "0.0";
-                      return `${ctx.label}: ${val} (${pct}%)`;
+        {/* Distribución por tipo (condicional) */}
+        {Object.keys(byType).length > 0 && Object.values(byType).some(v => v > 0) ? (
+          <div className="chart-card avoid-break">
+            <div className="card-title">Distribución por tipo</div>
+            <Pie
+              data={{
+                labels: typeLabels,
+                datasets: [{ data: typeCounts, backgroundColor: typeLabels.map((_, i) => PALETTE[i % PALETTE.length]) }],
+              }}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: "right" },
+                  tooltip: {
+                    callbacks: {
+                      label(ctx) {
+                        const total = typeCounts.reduce((a, b) => a + b, 0);
+                        const val = ctx.parsed;
+                        const pct = total ? ((val / total) * 100).toFixed(1) : "0.0";
+                        return `${ctx.label}: ${val} (${pct}%)`;
+                      },
                     },
                   },
                 },
-              },
-            }}
-          />
-        </div>
+              }}
+            />
+          </div>
+        ) : (
+          <div className="chart-card avoid-break">
+            <div className="card-title">Distribución por tipo</div>
+            <div className="empty">Sin datos suficientes en este período.</div>
+          </div>
+        )}
       </div>
 
-      {/* Top solicitantes + tipos */}
+      {/* Top solicitantes + Día de la semana */}
       <div className="charts-row">
         <div className="chart-card avoid-break">
           <div className="card-title">Top 10 solicitantes</div>
@@ -669,148 +704,6 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
 
         <div className="chart-card avoid-break">
-          <div className="card-title">Distribución por tipo</div>
-          <Pie
-            data={{
-              labels: typeLabels,
-              datasets: [{ data: typeCounts, backgroundColor: typeLabels.map((_, i) => PALETTE[i % PALETTE.length]) }],
-            }}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: "right" },
-                tooltip: {
-                  callbacks: {
-                    label(ctx) {
-                      const total = typeCounts.reduce((a, b) => a + b, 0);
-                      const val = ctx.parsed;
-                      const pct = total ? ((val / total) * 100).toFixed(1) : "0.0";
-                      return `${ctx.label}: ${val} (${pct}%)`;
-                    },
-                  },
-                },
-              },
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Tiempos diarios con SLA */}
-      <div className="charts-row">
-        <div className="chart-card wide avoid-break">
-          <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
-          <Line
-            data={{
-              labels: frDailyLabels,
-              datasets: [
-                {
-                  label: "Promedio diario (h)",
-                  data: frDailyHours,
-                  borderColor: "#0ea5e9",
-                  backgroundColor: "rgba(14,165,233,0.12)",
-                  tension: 0.3,
-                  fill: true,
-                },
-                {
-                  label: `SLA ${SLA_FIRST_RESPONSE_H} h`,
-                  data: frDailyLabels.map(() => SLA_FIRST_RESPONSE_H),
-                  borderColor: "#ef4444",
-                  borderDash: [6, 6],
-                  pointRadius: 0,
-                  tension: 0,
-                },
-              ],
-            }}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: "bottom" },
-                tooltip: {
-                  callbacks: {
-                    afterBody(ctx) {
-                      const v = ctx[0]?.parsed?.y;
-                      if (typeof v === "number") {
-                        const ok = v <= SLA_FIRST_RESPONSE_H;
-                        return ok ? "✅ Dentro de SLA" : "⛔ Fuera de SLA";
-                      }
-                      return "";
-                    },
-                  },
-                },
-              },
-              onClick: (_, elements) => {
-                if (!elements?.length) return;
-                const idx = elements[0].index;
-                const day = frDailyLabels[idx];
-                if (day) navigateToDate(day);
-              },
-              scales: {
-                x: { grid: { display: false } },
-                y: { beginAtZero: true, grid: { color: "rgba(148,163,184,.2)" } },
-              },
-            }}
-          />
-        </div>
-
-        <div className="chart-card avoid-break">
-          <div className="card-title">Tiempo promedio de resolución (h) por día</div>
-          <Line
-            data={{
-              labels: rsDailyLabels,
-              datasets: [
-                {
-                  label: "Promedio diario (h)",
-                  data: rsDailyHours,
-                  borderColor: "#10b981",
-                  backgroundColor: "rgba(16,185,129,0.12)",
-                  tension: 0.3,
-                  fill: true,
-                },
-                {
-                  label: `SLA ${SLA_RESOLUTION_H} h`,
-                  data: rsDailyLabels.map(() => SLA_RESOLUTION_H),
-                  borderColor: "#ef4444",
-                  borderDash: [6, 6],
-                  pointRadius: 0,
-                  tension: 0,
-                },
-              ],
-            }}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: "bottom" },
-                tooltip: {
-                  callbacks: {
-                    afterBody(ctx) {
-                      const v = ctx[0]?.parsed?.y;
-                      if (typeof v === "number") {
-                        const ok = v <= SLA_RESOLUTION_H;
-                        return ok ? "✅ Dentro de SLA" : "⛔ Fuera de SLA";
-                      }
-                      return "";
-                    },
-                  },
-                },
-              },
-              onClick: (_, elements) => {
-                if (!elements?.length) return;
-                const idx = elements[0].index;
-                const day = rsDailyLabels[idx];
-                if (day) navigateToDate(day);
-              },
-              scales: {
-                x: { grid: { display: false } },
-                y: { beginAtZero: true, grid: { color: "rgba(148,163,184,.2)" } },
-              },
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Día de la semana + Métricas */}
-      <div className="charts-row">
-        <div className="chart-card avoid-break">
           <div className="card-title">Tickets por día de la semana</div>
           <Bar
             data={{
@@ -827,19 +720,135 @@ export default function StatsPage({ tickets: propTickets }) {
             }}
           />
         </div>
+      </div>
 
-        <div className="chart-card avoid-break">
-          <div className="card-title">Métricas de rendimiento</div>
-          <ul className="metrics-list">
-            <li><span>Tiempo prom. 1ª respuesta</span><strong>{formatHours(avgFirstResponse)}</strong></li>
-            <li><span>Tiempo prom. resolución</span><strong>{formatHours(avgResolution)}</strong></li>
-            <li><span>FCR (1er contacto)</span><strong>{`${clamp(firstContactResolution,0,100).toFixed(1)}%`}</strong></li>
-          </ul>
-          <p className="metric-hint">
-            Las métricas dependen de que tus tickets tengan <code>createdAt</code>, <code>firstResponseAt</code> y <code>resolvedAt</code>
-            (o equivalentes como <code>fecha_creacion</code>/<code>primera_respuesta</code>/<code>fecha_cierre</code>).
-          </p>
-        </div>
+      {/* Tiempos diarios con SLA (condicionales) */}
+      <div className="charts-row">
+        {/* 1ª respuesta */}
+        {countFirstResponse > 0 ? (
+          <div className="chart-card wide avoid-break">
+            <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
+            <Line
+              data={{
+                labels: frDailyLabels,
+                datasets: [
+                  {
+                    label: "Promedio diario (h)",
+                    data: frDailyHours,
+                    borderColor: "#0ea5e9",
+                    backgroundColor: "rgba(14,165,233,0.12)",
+                    tension: 0.3,
+                    fill: true,
+                  },
+                  {
+                    label: `SLA ${SLA_FIRST_RESPONSE_H} h`,
+                    data: frDailyLabels.map(() => SLA_FIRST_RESPONSE_H),
+                    borderColor: "#ef4444",
+                    borderDash: [6, 6],
+                    pointRadius: 0,
+                    tension: 0,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: "bottom" },
+                  tooltip: {
+                    callbacks: {
+                      afterBody(ctx) {
+                        const v = ctx[0]?.parsed?.y;
+                        if (typeof v === "number") {
+                          const ok = v <= SLA_FIRST_RESPONSE_H;
+                          return ok ? "✅ Dentro de SLA" : "⛔ Fuera de SLA";
+                        }
+                        return "";
+                      },
+                    },
+                  },
+                },
+                onClick: (_, elements) => {
+                  if (!elements?.length) return;
+                  const idx = elements[0].index;
+                  const day = frDailyLabels[idx];
+                  if (day) navigateToDate(day);
+                },
+                scales: {
+                  x: { grid: { display: false } },
+                  y: { beginAtZero: true, grid: { color: "rgba(148,163,184,.2)" } },
+                },
+              }}
+            />
+          </div>
+        ) : (
+          <div className="chart-card wide avoid-break">
+            <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
+            <div className="empty">No hay tickets con 1ª respuesta registrada.</div>
+          </div>
+        )}
+
+        {/* Resolución */}
+        {countResolution > 0 ? (
+          <div className="chart-card avoid-break">
+            <div className="card-title">Tiempo promedio de resolución (h) por día</div>
+            <Line
+              data={{
+                labels: rsDailyLabels,
+                datasets: [
+                  {
+                    label: "Promedio diario (h)",
+                    data: rsDailyHours,
+                    borderColor: "#10b981",
+                    backgroundColor: "rgba(16,185,129,0.12)",
+                    tension: 0.3,
+                    fill: true,
+                  },
+                  {
+                    label: `SLA ${SLA_RESOLUTION_H} h`,
+                    data: rsDailyLabels.map(() => SLA_RESOLUTION_H),
+                    borderColor: "#ef4444",
+                    borderDash: [6, 6],
+                    pointRadius: 0,
+                    tension: 0,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: "bottom" },
+                  tooltip: {
+                    callbacks: {
+                      afterBody(ctx) {
+                        const v = ctx[0]?.parsed?.y;
+                        if (typeof v === "number") {
+                          const ok = v <= SLA_RESOLUTION_H;
+                          return ok ? "✅ Dentro de SLA" : "⛔ Fuera de SLA";
+                        }
+                        return "";
+                      },
+                    },
+                  },
+                },
+                onClick: (_, elements) => {
+                  if (!elements?.length) return;
+                  const idx = elements[0].index;
+                  const day = rsDailyLabels[idx];
+                  if (day) navigateToDate(day);
+                },
+                scales: {
+                  x: { grid: { display: false } },
+                  y: { beginAtZero: true, grid: { color: "rgba(148,163,184,.2)" } },
+                },
+              }}
+            />
+          </div>
+        ) : (
+          <div className="chart-card avoid-break">
+            <div className="card-title">Tiempo promedio de resolución (h) por día</div>
+            <div className="empty">No hay tickets resueltos/cerrados en el rango.</div>
+          </div>
+        )}
       </div>
     </div>
   );

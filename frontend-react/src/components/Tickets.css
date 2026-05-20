@@ -34,21 +34,61 @@
   background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:var(--shadow);padding:12px
 }
-.tks-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tks-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
 .tks-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* ====== BUSCADOR MEJORADO ====== */
+.search-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-icon-input {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 1;
+}
 
 .tks-search{
   width:280px;max-width:100%;
   background:var(--panel2);
   border:1px solid var(--border);
   color:var(--text);
-  border-radius:12px;padding:10px 12px;outline:none
+  border-radius:12px;
+  padding:10px 12px 10px 32px;
+  outline:none;
+  transition: all 0.2s ease;
 }
+
+.tks-search:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--brand) 20%, transparent);
+}
+
+.search-results-count {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel2);
+  padding: 2px 6px;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
 .tks-select{
   background:var(--panel2);
   border:1px solid var(--border);
   color:var(--text);
-  border-radius:10px;padding:10px 12px
+  border-radius:10px;padding:8px 12px;
+  cursor:pointer;
 }
 
 .tks-badge{
@@ -62,10 +102,16 @@
 .tks-thead th{
   position:sticky;top:0;background:var(--panel);
   border-bottom:1px solid var(--border);padding:10px 12px;text-align:left;
-  font-size:12px;color:var(--muted);backdrop-filter:blur(6px);z-index:1
+  font-size:12px;color:var(--muted);backdrop-filter:blur(6px);z-index:1;
+  cursor:pointer;
+  transition: color 0.2s ease;
+}
+.tks-thead th:hover {
+  color: var(--brand);
 }
 .tks-row{
   background:var(--panel2);border:1px solid var(--border);
+  transition: all 0.2s ease;
 }
 :root[data-theme="dark"] .tks-row{border-color:color-mix(in oklab,var(--border) 85%, #000)}
 .tks-row td{padding:12px}
@@ -79,6 +125,7 @@
   cursor:pointer
 }
 
+/* ====== ESTADOS ====== */
 .tks-status{
   padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;
   border:1px solid var(--border);background:#fff; color:#111827
@@ -102,17 +149,27 @@
 :root[data-theme="dark"] .tks-status.Reabierto{background:color-mix(in oklab,#fb923c 18%, transparent)}
 :root[data-theme="dark"] .tks-status.Cancelado{background:color-mix(in oklab,#ef4444 18%, transparent)}
 
+/* ====== PRIORIDADES ====== */
 .tks-prio{font-weight:700}
 .tks-prio.Baja{color:#2563eb}
 .tks-prio.Media{color:#b45309}
 .tks-prio.Alta{color:#b91c1c}
 
+/* ====== PAGINACIÓN ====== */
 .tks-pag{display:flex;justify-content:flex-end;gap:8px;align-items:center;margin-top:12px}
 .tks-btn{
   background:linear-gradient(180deg,var(--brand),color-mix(in oklab,var(--brand) 70%, #000));
-  color:#fff;border:0;border-radius:10px;padding:8px 12px;cursor:pointer
+  color:#fff;border:0;border-radius:10px;padding:8px 12px;cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  transition: all 0.2s ease;
 }
-.tks-btn[disabled]{opacity:.6;cursor:not-allowed}
+.tks-btn:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.tks-btn[disabled]{opacity:.6;cursor:not-allowed;transform:none}
 .tks-btn.ghost{
   background:#fff;color:var(--text);border:1px solid var(--border)
 }
@@ -120,17 +177,32 @@
   background:transparent;border:1px dashed color-mix(in oklab,var(--border) 80%, #fff 5%);color:var(--muted)
 }
 
+/* ====== LOADER ====== */
 .loader{display:inline-block;width:18px;height:18px;border-radius:999px;border:3px solid #d1d5db;border-top-color:#4f46e5;animation:spin .8s linear infinite}
 :root[data-theme="dark"] .loader{border-color:color-mix(in oklab,#fff 25%, var(--border));border-top-color:color-mix(in oklab,#93c5fd 85%, var(--brand))}
+.spin {
+  animation: spin 1s linear infinite;
+}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ====== EMPTY STATE ====== */
 .empty{
-  margin:12px 0;padding:16px;
+  margin:12px 0;padding:48px 24px;
   border:1px dashed var(--border);
-  background:var(--panel);border-radius:12px;color:var(--muted);text-align:center
+  background:var(--panel);border-radius:12px;
+  color:var(--muted);
+  text-align:center;
+  font-size:14px;
+}
+.empty::before {
+  content: "📭";
+  display: block;
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
-/* Drawer */
+/* ====== DRAWER ====== */
 .backdrop{
   position:fixed; inset:0; background:rgba(2,6,23,.35); backdrop-filter: blur(2px); z-index:70
 }
@@ -141,21 +213,24 @@
   transform: translateX(0); transition: transform .25s ease;
   display:flex; flex-direction:column;
 }
-.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)}
-.drawer-body{padding:12px;overflow:auto;background:var(--bg)}
-.drawer-foot{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:var(--panel)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border)}
+.drawer-body{padding:16px;overflow:auto;background:var(--bg)}
+.drawer-foot{padding:16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:var(--panel)}
 
+/* ====== TIMELINE ====== */
 .timeline{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .timeline li{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px}
-.timeline time{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+.timeline time{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:12px;margin-bottom:4px}
 
+/* ====== FORMULARIOS ====== */
 .input, .textarea, .select{
   width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
   border-radius:10px;padding:10px 12px;outline:none
 }
 .textarea{min-height:90px;resize:vertical}
-.hint{color:var(--muted);font-size:12px}
-/* Chips de cambios */
+.hint{color:var(--muted);font-size:12px;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+
+/* ====== CHIPS DE CAMBIOS ====== */
 .chip {
   display: inline-block;
   padding: 2px 8px;
@@ -168,43 +243,27 @@
 .chip + .chip { margin-left: 6px; }
 
 .chip-new {
-  background: #ecfeff; /* cyan-50 */
-  color: #155e75;      /* cyan-800 */
-  border-color: #a5f3fc; /* cyan-300 */
+  background: #ecfeff;
+  color: #155e75;
+  border-color: #a5f3fc;
 }
 .chip-comment {
-  background: #eef2ff; /* indigo-50 */
-  color: #3730a3;      /* indigo-800 */
-  border-color: #c7d2fe; /* indigo-300 */
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
 }
 .chip-state {
-  background: #f0fdf4; /* green-50 */
-  color: #166534;      /* green-800 */
-  border-color: #bbf7d0; /* green-300 */
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
 }
 .chip-prio {
-  background: #fff7ed; /* orange-50 */
-  color: #9a3412;      /* orange-800 */
-  border-color: #fed7aa; /* orange-300 */
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
 }
 
-/* Resaltado de fila con novedades (sutil en claro/oscuro) */
-.tks-row.row-new {
-  position: relative;
-  background: color-mix(in oklab, var(--bg) 85%, #fde68a); /* mezcla sutil con amber-300 */
-}
-html[data-theme="dark"] .tks-row.row-new {
-  background: color-mix(in oklab, var(--bg) 90%, #f59e0b);
-}
-
-/* Badge reutilizado ya existente: asegúrate de que sea legible */
-.tks-badge {
-  background: var(--chip-bg, #e5e7eb);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
-/* Leyenda compacta */
+/* ====== LEYENDA ====== */
 .tks-legend {
   display: flex;
   gap: 8px;
@@ -213,4 +272,205 @@ html[data-theme="dark"] .tks-row.row-new {
   margin: 6px 0 10px;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* ====== RESALTADO DE FILA ====== */
+.tks-row.row-new {
+  position: relative;
+  background: color-mix(in oklab, var(--bg) 85%, #fde68a);
+}
+html[data-theme="dark"] .tks-row.row-new {
+  background: color-mix(in oklab, var(--bg) 90%, #f59e0b);
+}
+
+/* ====== FECHA DE VENCIMIENTO ====== */
+.fecha-vencida {
+  color: var(--err);
+  font-weight: 600;
+  background: color-mix(in oklab, var(--err) 15%, transparent);
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.sin-fecha {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Fecha vencimiento en celda */
+.fecha-vencimiento-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Badge vencido */
+.badge-vencido {
+  background: var(--err);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
+/* ====== TOOLTIP ====== */
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+[data-tooltip]:before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11px;
+  border-radius: 6px;
+  white-space: nowrap;
+  display: none;
+  z-index: 100;
+}
+[data-tooltip]:hover:before {
+  display: block;
+}
+
+/* ====== RESPONSIVE ====== */
+@media (max-width: 768px) {
+  .tks-wrap {
+    padding: 12px;
+  }
+  
+  .tks-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .tks-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-wrapper {
+    width: 100%;
+  }
+  
+  .tks-search {
+    width: 100%;
+  }
+  
+  .tks-select {
+    width: 100%;
+  }
+  
+  .tks-table {
+    font-size: 12px;
+  }
+  
+  .tks-thead th {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+  
+  .tks-row td {
+    padding: 8px;
+  }
+  
+  .drawer {
+    width: 100%;
+  }
+  
+  .tks-pag {
+    justify-content: center;
+  }
+}
+/* ====== SELECTOR DE VISTA ====== */
+.tks-view-selector {
+  display: flex;
+  gap: 4px;
+  background: color-mix(in oklab, var(--border) 30%, transparent);
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.tks-view-btn {
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tks-view-btn:hover {
+  background: color-mix(in oklab, var(--brand) 20%, transparent);
+  color: var(--brand);
+}
+
+.tks-view-btn.active {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: white;
+}
+
+/* ====== CONTENEDOR DEL CALENDARIO ====== */
+.tks-calendar-wrapper {
+  margin-top: 16px;
+}
+
+/* Ajustes para el calendario dentro de Tickets */
+.tks-calendar-wrapper .calendar-view-container {
+  padding: 16px;
+  margin: 0;
+}
+
+.tks-calendar-wrapper .calendar-navbar {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .tks-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .tks-view-selector {
+    width: fit-content;
+  }
+  
+  .tks-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-wrapper {
+    width: 100%;
+  }
+  
+  .tks-search {
+    width: 100%;
+  }
+  
+  .tks-select {
+    width: 100%;
+  }
+  
+  .tks-calendar-wrapper .calendar-navbar {
+    flex-direction: column;
+  }
+  
+  .tks-calendar-wrapper .calendar-nav-left,
+  .tks-calendar-wrapper .calendar-nav-right {
+    justify-content: center;
+  }
 }

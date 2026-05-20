@@ -1,4 +1,3 @@
-// mailers/ticketMailer.js
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
@@ -8,11 +7,10 @@ const path = require('path');
    ========================= */
 const SMTP_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const SMTP_PORT = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587;
-const SMTP_SECURE = SMTP_PORT === 465; // 465=SSL; 587=STARTTLS
+const SMTP_SECURE = SMTP_PORT === 465;
 const EMAIL_FROM = process.env.EMAIL_FROM;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 
-// Opcionales: CC/BCC globales
 const MAIL_CC  = process.env.MAIL_CC  || '';
 const MAIL_BCC = process.env.MAIL_BCC || '';
 
@@ -41,6 +39,9 @@ const fmtHora = d =>
 const fmtDateTimeShort = d =>
   new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short', timeZone: TZ }).format(d);
 
+const fmtDateShort = d =>
+  new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeZone: TZ }).format(d);
+
 const esc = (s = '') =>
   String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
@@ -49,7 +50,6 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
 const BACKEND_URL  = (process.env.BACKEND_URL  || process.env.APP_URL || '').replace(/\/$/, '');
 const BRAND_NAME   = process.env.BRAND_NAME || 'Portfolio Investment';
 
-/** Construye URL pública de imágenes (historial/adjuntos) */
 const makeImageUrl = (filename) => {
   if (!filename) return null;
   if (/^https?:\/\//i.test(filename)) return filename;
@@ -58,62 +58,36 @@ const makeImageUrl = (filename) => {
   return null;
 };
 
-/** Enlace al ticket configurable: FRONTEND_TICKET_PATH: /tickets/:id  o  /tickets/numero/:numero */
 function buildTicketLink(ticket) {
   const base = FRONTEND_URL || 'http://localhost:3000';
-  const pattern = (process.env.FRONTEND_TICKET_PATH || '/tickets/:id').trim();
+  const pattern = (process.env.FRONTEND_TICKET_PATH || '/tareas/:id').trim();
   const pathOut = pattern
     .replace(':id', encodeURIComponent(ticket._id))
     .replace(':numero', encodeURIComponent(ticket.numero_ticket));
   return `${base}${pathOut}`;
 }
 
-/** Logo: prioriza CID y luego URL */
 function buildLogoBlock() {
-  const logoFileEnv = process.env.BRAND_LOGO_FILE; // ruta local absoluta o relativa
-  const backendPublicLogo = path.resolve('public', 'logo.png'); // backend/public/logo.png
+  const logoFileEnv = process.env.BRAND_LOGO_FILE;
+  const backendPublicLogo = path.resolve('public', 'logo.png');
   const logoUrlRaw = process.env.BRAND_LOGO_URL || '/logo.png';
 
   const makeCidTag = () =>
-    `<img src="cid:brandLogo" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`;
+    `<img src="cid:brandLogo" width="40" height="40" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;border-radius:8px;">`;
 
-  // 1) BRAND_LOGO_FILE → CID
   if (logoFileEnv) {
     const abs = path.isAbsolute(logoFileEnv) ? logoFileEnv : path.resolve(logoFileEnv);
     if (fs.existsSync(abs)) {
       return { htmlTag: makeCidTag(), attachment: { filename: path.basename(abs), path: abs, cid: 'brandLogo' } };
     }
   }
-  // 2) backend/public/logo.png → CID
   if (fs.existsSync(backendPublicLogo)) {
     return { htmlTag: makeCidTag(), attachment: { filename: 'logo.png', path: backendPublicLogo, cid: 'brandLogo' } };
-  }
-  // 3) URL absoluta
-  if (/^https?:\/\//i.test(logoUrlRaw)) {
-    return { htmlTag: `<img src="${logoUrlRaw}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`, attachment: null };
-  }
-  // 4) BACKEND_URL + /logo.png
-  if (BACKEND_URL) {
-    const url = `${BACKEND_URL}/logo.png`;
-    return { htmlTag: `<img src="${url}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`, attachment: null };
-  }
-  // 5) FRONTEND_URL + /logo.png
-  if (FRONTEND_URL) {
-    const url = `${FRONTEND_URL}/logo.png`;
-    return { htmlTag: `<img src="${url}" width="36" height="36" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px">`, attachment: null };
   }
   return { htmlTag: '', attachment: null };
 }
 
-/* ====== TIMELINE ====== */
-function resolveAuthorRole(entry = {}, ticket = {}) {
-  const autor = (entry.autor || '').toLowerCase();
-  const cliente = (ticket.usuario_id?.email || ticket.creadoPor || '').toLowerCase();
-  const agente  = (ticket.asignadoA?.email || ticket.asignadoA || '').toLowerCase();
-  if (autor && cliente && autor === cliente) return 'cliente';
-  if (autor && agente && autor === agente) return 'agente';
-  return 'otro';
-}
+/* ====== INITIALS ====== */
 function initials(email = '') {
   const base = (email.split('@')[0] || '').replace(/[^a-zA-Z0-9]/g, ' ').trim();
   const parts = base.split(/\s+/).filter(Boolean);
@@ -121,55 +95,101 @@ function initials(email = '') {
   const i2 = parts[1]?.[0] || '';
   return (i1 + i2).toUpperCase().slice(0, 2);
 }
+
+/* ====== COLORES POR ROL ====== */
+function getRoleColors(entry, ticket) {
+  const autor = (entry.autor || '').toLowerCase();
+  const cliente = (ticket.usuario_id?.email || ticket.creadoPor || '').toLowerCase();
+  
+  const esAsignado = ticket.asignados?.some(a => {
+    const email = (a.email || '').toLowerCase();
+    return email === autor;
+  });
+  
+  // Admin
+  if (autor === 'envios@portfolioinvestment.com.ar' || autor.includes('admin')) {
+    return {
+      bg: '#faf5ff', border: '#e9d5ff', avatarBg: '#7c3aed',
+      badge: '#f3e8ff', badgeText: '#6b21a8', label: 'Admin',
+      showBadge: true
+    };
+  }
+  
+  // Cliente (creador)
+  if (autor && cliente && autor === cliente) {
+    return {
+      bg: '#f8fafc', border: '#e2e8f0', avatarBg: '#64748b',
+      badge: '#f1f5f9', badgeText: '#475569', label: '',
+      showBadge: false
+    };
+  }
+  
+  // Agente asignado
+  if (autor && esAsignado) {
+    return {
+      bg: '#f8fafc', border: '#e2e8f0', avatarBg: '#475569',
+      badge: '#f1f5f9', badgeText: '#475569', label: '',
+      showBadge: false
+    };
+  }
+  
+  // Sistema
+  if (autor === 'sistema') {
+    return {
+      bg: '#faf5ff', border: '#e9d5ff', avatarBg: '#7c3aed',
+      badge: '#f3e8ff', badgeText: '#6b21a8', label: 'Admin',
+      showBadge: true
+    };
+  }
+  
+  // Default
+  return {
+    bg: '#f8fafc', border: '#e2e8f0', avatarBg: '#64748b',
+    badge: '#f1f5f9', badgeText: '#475569', label: '',
+    showBadge: false
+  };
+}
+
+/* ====== COMMENT CARD ====== */
 function renderCommentCard(entry, ticket, isLast = false) {
   const when = entry.fecha ? fmtDateTimeShort(new Date(entry.fecha)) : 'Fecha desconocida';
-  const estado = esc(entry.estado || '');
-  const autor = esc(entry.autor || 'Desconocido');
+  const autor = esc(entry.autor || 'Sistema');
   const comment = esc(entry.comentario || '').replace(/\n/g, '<br>');
   const imgUrl = makeImageUrl(entry.imagen);
-  const role = resolveAuthorRole(entry, ticket);
-
-  const roleBadge = role === 'cliente'
-    ? 'background:#e0f2fe;color:#075985;'
-    : role === 'agente'
-    ? 'background:#dcfce7;color:#065f46;'
-    : 'background:#f1f5f9;color:#0f172a;';
-
-  const border = role === 'cliente'
-    ? 'border-left:4px solid #38bdf8;'
-    : role === 'agente'
-    ? 'border-left:4px solid #34d399;'
-    : 'border-left:4px solid #cbd5e1;';
-
-  const lastRibbon = isLast
-    ? `<div style="font-size:11px;color:#0f172a;background:#fef3c7;border:1px solid #fde68a;padding:2px 6px;border-radius:999px;display:inline-block;margin-left:8px;">Último</div>`
-    : '';
+  const estado = esc(entry.estado || '');
+  const colors = getRoleColors(entry, ticket);
+  const inicial = initials(entry.autor || 'S');
 
   return `
-    <div style="margin-bottom:10px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#ffffff;${border}">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-        <div style="width:28px;height:28px;border-radius:999px;background:#e2e8f0;color:#0f172a;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;">
-          ${initials(entry.autor || '')}
-        </div>
-        <div style="font-size:12px;color:#475569;">
-          <strong style="color:#0f172a">${autor}</strong> · ${when} ${lastRibbon}
-        </div>
-        <div style="margin-left:auto;">
-          <span style="display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;${roleBadge}">
-            ${role === 'cliente' ? 'Cliente' : role === 'agente' ? 'Agente' : 'Otro'}
-          </span>
-          ${estado ? `<span style="display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;background:#eef2ff;color:#3730a3;margin-left:6px;">${estado}</span>` : ''}
-        </div>
-      </div>
-      <div style="font-size:14px;line-height:1.55;color:#0f172a;">${comment || '<em style="color:#64748b">Sin contenido</em>'}</div>
-      ${imgUrl ? `
-        <div style="margin-top:8px;">
-          <a href="${imgUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">Ver imagen adjunta</a>
-        </div>
-      ` : ''}
+    <div style="margin-bottom:10px;padding:14px 16px;background:${colors.bg};border:1px solid ${colors.border};border-radius:10px;${isLast ? 'border-left:3px solid #6366f1;' : ''}">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td width="44" style="vertical-align:top;padding-right:14px;">
+            <table cellpadding="0" cellspacing="0" border="0" width="44" height="44" style="width:44px;height:44px;">
+              <tr>
+                <td align="center" valign="middle" style="width:44px;height:44px;background:${colors.avatarBg};border-radius:50%;text-align:center;vertical-align:middle;">
+                  <span style="display:inline-block;color:#ffffff;font-size:15px;font-weight:700;line-height:44px;text-align:center;width:44px;font-family:Arial,Helvetica,sans-serif;">${inicial}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td style="vertical-align:top;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+              <span style="font-size:13px;font-weight:600;color:#1e293b;">${autor}</span>
+              ${colors.showBadge ? `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:${colors.badge};color:${colors.badgeText};">${colors.label}</span>` : ''}
+              ${isLast ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:#eef2ff;color:#4f46e5;">Nuevo</span>' : ''}
+              ${estado ? `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:500;background:#f1f5f9;color:#64748b;">${estado}</span>` : ''}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">${when}</div>
+            <div style="font-size:13px;line-height:1.6;color:#475569;">${comment || '<span style="color:#94a3b8;font-style:italic;">Sin contenido</span>'}</div>
+            ${imgUrl ? `<div style="margin-top:8px;padding:8px 12px;background:#ffffff;border:1px solid ${colors.border};border-radius:8px;display:inline-block;"><a href="${imgUrl}" target="_blank" rel="noopener noreferrer" style="color:#4f46e5;text-decoration:none;font-size:12px;font-weight:500;">Ver imagen adjunta</a></div>` : ''}
+          </td>
+        </tr>
+      </table>
     </div>
   `;
 }
+
 function isSameComment(a, b) {
   if (!a || !b) return false;
   const sameText = (a.comentario || '').trim() === (b.comentario || '').trim();
@@ -180,15 +200,81 @@ function isSameComment(a, b) {
   return sameText && sameAuthor && close;
 }
 
-/* ====== SUBJECT + PREHEADER ====== */
+/* ====== COLORES DE ESTADO Y PRIORIDAD ====== */
+const estadoColores = {
+  pendiente:  { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+  abierto:    { bg: '#dcfce7', text: '#065f46', border: '#22c55e' },
+  en_proceso: { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
+  resuelto:   { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+  cerrado:    { bg: '#f1f5f9', text: '#475569', border: '#94a3b8' },
+  reabierto:  { bg: '#ffedd5', text: '#9a3412', border: '#f97316' },
+  cancelado:  { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' },
+  archivado:  { bg: '#f3f4f6', text: '#6b7280', border: '#9ca3af' },
+  archivada:  { bg: '#f3f4f6', text: '#6b7280', border: '#9ca3af' }
+};
+
+const prioridadColores = {
+  baja:   { bg: '#f0fdf4', text: '#166534', badge: '#22c55e' },
+  media:  { bg: '#fefce8', text: '#854d0e', badge: '#eab308' },
+  alta:   { bg: '#fef2f2', text: '#991b1b', badge: '#ef4444' },
+  urgente:{ bg: '#fef2f2', text: '#7f1d1d', badge: '#dc2626' }
+};
+
+/* ====== FORMATO DE RECURRENCIA ====== */
+function formatRecurrencia(ticket) {
+  if (!ticket.es_recurrente || !ticket.recurrencia) return null;
+  const rec = ticket.recurrencia;
+  if (!rec.activa && !ticket.es_recurrente) return null;
+  
+  const tipoTexto = { diaria: 'días', semanal: 'semanas', mensual: 'meses', anual: 'años' };
+  const nombresDias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  
+  let descripcion = `Cada ${rec.intervalo || 1} ${tipoTexto[rec.tipo] || rec.tipo}`;
+  if (rec.tipo === 'semanal' && rec.dias_semana?.length) {
+    const dias = rec.dias_semana.map(d => nombresDias[d]).join(', ');
+    descripcion += ` (${dias})`;
+  }
+  if (rec.tipo === 'mensual' && rec.dia_mes) descripcion += ` el día ${rec.dia_mes}`;
+  if (rec.solo_dias_habiles !== false) descripcion += ' · Solo días hábiles';
+  if (rec.fecha_fin) descripcion += ` · Hasta ${fmtDateShort(new Date(rec.fecha_fin))}`;
+  
+  return { activa: rec.activa !== false, descripcion, tipo: rec.tipo };
+}
+
+/* ====== SUBJECTS ====== */
 function composeSubject(accion, ticket) {
   const numero = ticket.numero_ticket;
   const asunto = (ticket.asunto || '').trim();
-  const base =
-    accion === 'crear'     ? ' Nuevo' :
-    accion === 'estado'    ? ' Actualizado' :
-    /* comentario */         ' Comentario';
-  return `${base} · Ticket #${numero}${asunto ? ` · ${asunto}` : ''}`;
+  
+  const tipos = {
+    '30_dias': 'Recordatorio 30 días',
+    '21_dias': 'Recordatorio 21 días',
+    '14_dias': 'Recordatorio 14 días',
+    '7_dias': 'Recordatorio 7 días',
+    '3_dias': 'URGENTE - 3 días',
+    '1_dia': 'URGENTE - Vence mañana',
+    'hoy': 'URGENTE - Vence HOY',
+    'proximo_recordatorio': 'Recordatorio de Vencimiento',
+    'vencido_recordatorio': 'Tarea Vencida',
+    'vencida_1': 'Tarea Vencida',
+    'vencida_3': 'Tarea Vencida (3 días)',
+    'vencida_7': 'Tarea Vencida (1 semana)',
+    'vencida_14': 'Tarea Vencida (2 semanas)',
+    'vencida_30': 'Tarea Vencida (1 mes)',
+    'crear': 'Nueva Tarea',
+    'estado': 'Tarea Actualizada',
+    'comentario': 'Nuevo Comentario',
+    'asignacion_usuario': 'Has sido asignado a una tarea',
+    'asignacion_creador': 'Usuario asignado a tu tarea',
+    'asignacion_admin': 'Nueva asignación en tarea',
+    'desasignacion_usuario': 'Has sido desasignado de una tarea',
+    'desasignacion_creador': 'Usuario desasignado de tu tarea',
+    'desasignacion_admin': 'Desasignación en tarea',
+    'tarea_recurrente': 'Nueva tarea generada (Recurrencia)'
+  };
+  
+  const prefijo = tipos[accion] || 'Actualización';
+  return `${prefijo} · Tarea #${numero}${asunto ? ` · ${asunto}` : ''}`;
 }
 
 function composePreheader(accion, ticket, ultimo) {
@@ -197,11 +283,10 @@ function composePreheader(accion, ticket, ultimo) {
     const short = (ultimo.comentario || '').replace(/\s+/g,' ').slice(0, 80);
     return `${autor}: ${short}`;
   }
-  if (accion === 'estado') {
-    return `Estado: ${ticket.estado || 'N/A'} · Prioridad: ${ticket.prioridad || 'N/A'}`;
-  }
-  // crear
-  return `Creado por ${ticket.usuario_id?.email || 'usuario'} · Estado ${ticket.estado || 'N/A'}`;
+  if (accion === 'estado') return `Estado: ${ticket.estado} · Prioridad: ${ticket.prioridad}`;
+  if (accion.includes('asignacion') || accion.includes('desasignacion')) return `Tarea #${ticket.numero_ticket}: ${ticket.asunto || ''}`;
+  if (accion === 'tarea_recurrente') return `Nueva tarea generada automáticamente: ${ticket.asunto || ''}`;
+  return `Tarea #${ticket.numero_ticket} · ${ticket.estado} · ${ticket.prioridad}`;
 }
 
 /* =========================
@@ -229,18 +314,94 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
 
   const enlaceTicket = buildTicketLink(ticket);
 
-  // Título y preheader
-  const subject = composeSubject(accion, ticket);
-  const preheaderText = composePreheader(accion, ticket, Array.isArray(ticket.historial) ? ticket.historial[ticket.historial.length - 1] : null);
+  const eColor = estadoColores[estado] || estadoColores.pendiente;
+  const pColor = prioridadColores[prioridad] || prioridadColores.media;
 
-  const labelAccion =
-    accion === 'crear' ? 'Nuevo ticket' :
-    accion === 'estado' ? 'Ticket actualizado' :
-    'Nuevo comentario';
+  let fechaVencimientoHtml = '';
+  let fechaVencimientoTexto = '';
+  let esVencida = false;
+  
+  if (ticket.fecha_vencimiento) {
+    const fechaVen = new Date(ticket.fecha_vencimiento);
+    const fechaVenStr = fmtDateShort(fechaVen);
+    const horaVenStr = fmtHora(fechaVen);
+    esVencida = fechaVen < new Date();
+    const diasInfo = ticket.diasHastaVencimiento || Math.ceil((fechaVen - new Date()) / (1000 * 60 * 60 * 24));
+    
+    fechaVencimientoHtml = `
+      <tr>
+        <td style="width:150px;color:#64748b;font-size:13px;padding:6px 0;">Fecha de vencimiento</td>
+        <td style="padding:6px 0;${esVencida ? 'color:#dc2626;font-weight:600;' : 'color:#1e293b;'}">
+          ${fechaVenStr} a las ${horaVenStr}
+          ${esVencida ? '<span style="display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px;">VENCIDA</span>' : ''}
+          ${diasInfo > 0 && !esVencida ? `<span style="display:inline-block;background:#fefce8;color:#a16207;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;margin-left:8px;">En ${diasInfo} días</span>` : ''}
+        </td>
+      </tr>
+    `;
+    fechaVencimientoTexto = `${fechaVenStr} a las ${horaVenStr}`;
+  }
+
+  const recurrenciaInfo = formatRecurrencia(ticket);
+  let recurrenciaHtml = '';
+  if (recurrenciaInfo) {
+    recurrenciaHtml = `
+      <tr>
+        <td style="width:150px;color:#64748b;font-size:13px;padding:6px 0;">Recurrencia</td>
+        <td style="padding:6px 0;color:#1e293b;">
+          <span style="display:inline-block;background:#eef2ff;color:#4f46e5;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:500;">
+            ${recurrenciaInfo.activa ? 'Activa' : 'Inactiva'} · ${recurrenciaInfo.descripcion}
+          </span>
+        </td>
+      </tr>
+    `;
+  }
+
+  const titulosTipo = {
+    '30_dias': 'Recordatorio de Vencimiento',
+    '21_dias': 'Recordatorio de Vencimiento',
+    '14_dias': 'Recordatorio de Vencimiento',
+    '7_dias': 'Recordatorio Importante',
+    '3_dias': 'Aviso Urgente de Vencimiento',
+    '1_dia': 'La tarea vence mañana',
+    'hoy': 'La tarea vence hoy',
+    'proximo_recordatorio': 'Recordatorio de Vencimiento',
+    'vencido_recordatorio': 'Tarea Pendiente de Resolución',
+    'vencida_1': 'Tarea Vencida',
+    'vencida_3': 'Tarea Vencida',
+    'vencida_7': 'Tarea Vencida',
+    'vencida_14': 'Tarea Vencida',
+    'vencida_30': 'Tarea Vencida',
+    'crear': 'Nueva Tarea Creada',
+    'estado': 'Tarea Actualizada',
+    'comentario': 'Nuevo Comentario',
+    'asignacion_usuario': 'Has sido asignado a una tarea',
+    'asignacion_creador': 'Usuario asignado a tu tarea',
+    'asignacion_admin': 'Nueva asignación',
+    'desasignacion_usuario': 'Has sido desasignado',
+    'desasignacion_creador': 'Usuario desasignado',
+    'desasignacion_admin': 'Desasignación',
+    'tarea_recurrente': 'Tarea Generada Automáticamente'
+  };
+  
+  const tituloNotificacion = titulosTipo[accion] || 'Actualización de Tarea';
+  
+  const labelAccion = accion.includes('dias') || accion === 'hoy' || accion.includes('vencida') ||
+                      accion === 'proximo_recordatorio' || accion === 'vencido_recordatorio'
+    ? 'Recordatorio'
+    : accion === 'crear' ? 'Nueva Tarea'
+    : accion === 'estado' ? 'Actualización'
+    : accion === 'comentario' ? 'Comentario'
+    : accion.includes('asignacion') ? 'Asignación'
+    : accion.includes('desasignacion') ? 'Desasignación'
+    : accion === 'tarea_recurrente' ? 'Recurrencia'
+    : 'Actualización';
+
+  const subject = composeSubject(accion, ticket);
+  const preheaderText = composePreheader(accion, ticket, 
+    Array.isArray(ticket.historial) ? ticket.historial[ticket.historial.length - 1] : null);
 
   const { htmlTag: logoTag, attachment: logoAttachment } = buildLogoBlock();
 
-  // Orden y bloques de comentarios
   const historialOrdenado = Array.isArray(ticket.historial)
     ? ticket.historial.slice().sort((a,b) => new Date(a.fecha) - new Date(b.fecha))
     : [];
@@ -250,7 +411,7 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
     ? renderCommentCard(ultimo, ticket, true)
     : '';
 
-  const MAX_HISTORY = 8;
+  const MAX_HISTORY = 5;
   const itemsHistorial = [];
   for (let i = historialOrdenado.length - 1; i >= 0; i--) {
     const entry = historialOrdenado[i];
@@ -260,149 +421,176 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
   }
   const historialHtml = itemsHistorial.length
     ? itemsHistorial.join('')
-    : `<div style="font-size:13px;color:#64748b;"><em>Sin actividad adicional</em></div>`;
-  const showMoreHtml = (historialOrdenado.length - (ultimoHtml ? 1 : 0) > MAX_HISTORY)
-    ? `<div style="margin-top:6px;color:#64748b;font-size:12px;">… Hay más actividad. Consulte el ticket para ver el historial completo.</div>`
     : '';
 
-  // Texto plano (fallback)
+  // Texto plano
   const textLines = [];
-  textLines.push(subject);
-  textLines.push(`Ticket #${numero}`);
+  textLines.push(`Tarea #${numero} - ${tituloNotificacion}`);
   textLines.push('');
-  if (accion === 'crear') {
-    textLines.push(`Asunto: ${ticket.asunto || ''}`);
-    textLines.push(`Fecha: ${fechaStr}`);
-    textLines.push(`Hora: ${horaStr}`);
-    textLines.push(`Creado por: ${ticket.usuario_id?.email || ''}`);
-    textLines.push(`Estado: ${ticket.estado || 'N/A'}`);
-    textLines.push(`Prioridad: ${ticket.prioridad || 'N/A'}`);
+  textLines.push(`Asunto: ${ticket.asunto || ''}`);
+  textLines.push(`Creado: ${fechaStr} a las ${horaStr}`);
+  if (ticket.fecha_vencimiento) textLines.push(`Vencimiento: ${fechaVencimientoTexto}`);
+  if (recurrenciaInfo) textLines.push(`Recurrencia: ${recurrenciaInfo.descripcion}`);
+  textLines.push(`Creado por: ${creador}`);
+  textLines.push(`Estado: ${estado} · Prioridad: ${prioridad}`);
+  textLines.push('');
+  textLines.push('Descripción:');
+  textLines.push(ticket.descripcion || 'Sin descripción');
+  
+  if (accion === 'comentario' && ultimo) {
     textLines.push('');
-    textLines.push('Descripción:');
-    textLines.push(ticket.descripcion || '');
-  } else if (accion === 'estado') {
-    textLines.push(`Estado actual: ${ticket.estado || 'N/A'}`);
-    textLines.push(`Prioridad actual: ${ticket.prioridad || 'N/A'}`);
-    textLines.push(`Fecha/Hora: ${fmtDateTimeShort(new Date())}`);
-  } else if (accion === 'comentario') {
-    if (ultimo) {
-      textLines.push(`${fmtDateTimeShort(new Date(ultimo.fecha || Date.now()))} - ${ultimo.estado || ''}:`);
-      textLines.push((ultimo.comentario || '').trim());
-      if (ultimo.autor) textLines.push(`(${ultimo.autor})`);
-    } else {
-      textLines.push(`Ticket #${numero} actualizado con un nuevo comentario.`);
-    }
+    textLines.push('Nuevo comentario:');
+    textLines.push(`${fmtDateTimeShort(new Date(ultimo.fecha || Date.now()))} - ${ultimo.autor || 'Sistema'}:`);
+    textLines.push((ultimo.comentario || '').trim());
   }
+  
+  if (ticket.descripcionRecordatorio) {
+    textLines.push('');
+    textLines.push(ticket.descripcionRecordatorio);
+  }
+  
   textLines.push('');
-  textLines.push(`No responda a este correo. Siga el ticket aquí: ${enlaceTicket}`);
+  textLines.push(`Ver tarea: ${enlaceTicket}`);
+  textLines.push('');
+  textLines.push('No responda a este correo. Ingrese al sistema para continuar con el seguimiento.');
   const text = textLines.join('\n');
 
   // HTML
   const preheader = esc(preheaderText || '');
 
   let html = `
-  <div style="font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-    <!-- preheader (invisible) -->
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-      ${preheader}
-    </div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px;border-bottom:1px solid #e5e7eb;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-            <tr>
-              <td valign="middle" style="padding:0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                  <tr>
-                    ${logoTag ? `<td valign="middle" style="padding:0;padding-right:12px;">${logoTag}</td>` : ``}
-                    <td valign="middle" style="padding:0;">
-                      <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1;">${BRAND_NAME}</div>
-                      <div style="font-size:12px;color:#64748b;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;">${labelAccion}</div>
-                      <div style="font-size:20px;font-weight:800;margin-top:4px;color:#0f172a;">Ticket #${numero}</div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <td valign="middle" align="right" style="padding:0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                  <tr>
-                    <td style="padding-left:6px;">
-                      <span style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;background:#eef2ff;color:#3730a3;font-weight:700;">${estado}</span>
-                    </td>
-                    <td style="padding-left:6px;">
-                      <span style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;background:#fef3c7;color:#92400e;font-weight:700;">${prioridad}</span>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
 
-      <tr>
-        <td style="padding:16px 20px;">
-          <table role="presentation" width="100%" style="border-collapse:separate;border-spacing:0 8px;">
-            <tr><td style="width:140px;color:#64748b;font-size:13px;">Asunto</td><td style="font-weight:600;">${asuntoTicket}</td></tr>
-            <tr><td style="width:140px;color:#64748b;font-size:13px;">Fecha</td><td>${fmtFecha(createdSafe)}</td></tr>
-            <tr><td style="width:140px;color:#64748b;font-size:13px;">Hora</td><td>${fmtHora(createdSafe)}</td></tr>
-            <tr><td style="width:140px;color:#64748b;font-size:13px;">Creado por</td><td>${creador}</td></tr>
-          </table>
+          <!-- Header -->
+          <tr>
+            <td style="padding:24px 28px;background:#ffffff;border-bottom:1px solid #e8ecf0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  ${logoTag ? `<td width="48" style="vertical-align:middle;">${logoTag}</td>` : ''}
+                  <td style="vertical-align:middle;${logoTag ? 'padding-left:14px;' : ''}">
+                    <div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;">${BRAND_NAME}</div>
+                    <div style="font-size:12px;color:#64748b;letter-spacing:.06em;text-transform:uppercase;margin-top:2px;">${labelAccion}</div>
+                  </td>
+                  <td align="right" style="vertical-align:middle;">
+                    <span style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${eColor.bg};color:${eColor.text};border:1px solid ${eColor.border};">${estado}</span>
+                    <span style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${pColor.bg};color:${pColor.text};margin-left:6px;border:1px solid ${pColor.badge};">${prioridad}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-          ${accion === 'crear' ? `
-            <div style="margin-top:14px;">
-              <div style="color:#64748b;font-size:13px;margin-bottom:6px;">Descripción</div>
-              <div style="font-size:14px;line-height:1.55;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;">
-                ${descripcion || '<em style="color:#64748b">Sin descripción</em>'}
+          <!-- Título -->
+          <tr>
+            <td style="padding:20px 28px 0;">
+              <div style="font-size:20px;font-weight:700;color:#0f172a;line-height:1.4;">${tituloNotificacion}</div>
+              <div style="font-size:14px;color:#64748b;margin-top:4px;">Tarea <strong style="color:#1e293b;">#${numero}</strong> · ${asuntoTicket}</div>
+            </td>
+          </tr>
+
+          <!-- Detalles -->
+          <tr>
+            <td style="padding:16px 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                <tr>
+                  <td style="width:150px;color:#64748b;font-size:13px;padding:6px 0;">Creado</td>
+                  <td style="padding:6px 0;color:#1e293b;">${fechaStr} a las ${horaStr}</td>
+                </tr>
+                ${fechaVencimientoHtml}
+                ${recurrenciaHtml}
+                <tr>
+                  <td style="width:150px;color:#64748b;font-size:13px;padding:6px 0;">Creado por</td>
+                  <td style="padding:6px 0;color:#1e293b;">${creador}</td>
+                </tr>
+              </table>
+
+              <!-- Descripción -->
+              <div style="margin-top:16px;">
+                <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px;">Descripción</div>
+                <div style="font-size:14px;line-height:1.65;color:#334155;background:#f8fafc;border:1px solid #e8ecf0;border-radius:10px;padding:14px 16px;">
+                  ${descripcion || '<span style="color:#94a3b8;">Sin descripción</span>'}
+                </div>
               </div>
-            </div>
-          ` : ''}
 
-          ${accion === 'comentario' && ultimoHtml ? `
-            <div style="margin-top:16px;">
-              <div style="color:#64748b;font-size:13px;margin-bottom:6px;">Último comentario</div>
-              ${ultimoHtml}
-            </div>
-          ` : ''}
+              <!-- Recordatorio -->
+              ${ticket.descripcionRecordatorio ? `
+              <div style="margin-top:16px;padding:14px 16px;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:8px;">
+                <div style="font-size:13px;font-weight:600;color:#92400e;">Aviso Importante</div>
+                <div style="font-size:13px;color:#78350f;margin-top:4px;line-height:1.5;">${ticket.descripcionRecordatorio}</div>
+              </div>
+              ` : ''}
 
-          ${Array.isArray(ticket.historial) && ticket.historial.length ? `
-            <div style="margin-top:16px;">
-              <div style="color:#64748b;font-size:13px;margin-bottom:6px;">Historial reciente</div>
-              ${historialHtml}
-              ${showMoreHtml}
-            </div>
-          ` : ''}
+              <!-- Último comentario -->
+              ${accion === 'comentario' && ultimoHtml ? `
+              <div style="margin-top:20px;">
+                <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:10px;">Nuevo Comentario</div>
+                ${ultimoHtml}
+              </div>
+              ` : ''}
 
-          ${FRONTEND_URL ? `
-            <div style="margin-top:18px;">
-              <a href="${enlaceTicket}" target="_blank" rel="noopener noreferrer"
-                style="display:inline-block;padding:12px 16px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:10px;font-weight:700;">
-                Ver ticket
-              </a>
-            </div>
-          ` : ''}
+              <!-- Historial -->
+              ${Array.isArray(ticket.historial) && ticket.historial.length ? `
+              <div style="margin-top:20px;">
+                <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:10px;">Historial Reciente</div>
+                ${historialHtml}
+              </div>
+              ` : ''}
 
-        </td>
-      </tr>
+              <!-- Botón -->
+              ${FRONTEND_URL ? `
+              <div style="margin-top:20px;text-align:center;">
+                <a href="${enlaceTicket}" target="_blank" rel="noopener noreferrer"
+                  style="display:inline-block;padding:12px 28px;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px;">
+                  Ver tarea en el sistema
+                </a>
+              </div>
+              ` : ''}
 
-      <tr>
-        <td style="padding:14px 20px;border-top:1px solid #e5e7eb;font-size:12px;color:#64748b;background:#f9fafb;">
-          ⚠️ No responda a este correo. Para continuar con el seguimiento, ingrese al sistema y acceda al ticket #${numero}.
-        </td>
-      </tr>
-    </table>
-  </div>
+              <!-- Silenciar -->
+              <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:8px;text-align:center;">
+                <span style="font-size:12px;color:#94a3b8;">No desea recibir más avisos sobre esta tarea?</span>
+                <a href="${FRONTEND_URL}/tareas/${ticket._id}/silenciar" style="color:#4f46e5;text-decoration:none;font-size:12px;font-weight:500;margin-left:4px;">Silenciar notificaciones</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 28px;border-top:1px solid #e8ecf0;background:#f8fafc;text-align:center;">
+              <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+                Este es un mensaje automático del Sistema de Gestión de Tareas de ${BRAND_NAME}.<br>
+                Por favor, no responda a este correo.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
   `;
 
-  // Adjuntos (si existen en disco)
+  // Adjuntos
   const attachments = [];
-  // Imagen directa pasada por el controller (crear/comentario con imagen)
   if (imagenPath) {
     const full = path.resolve(imagenPath);
     if (fs.existsSync(full)) attachments.push({ filename: path.basename(full), path: full });
   }
-  // Imágenes presentes en historial
   if (Array.isArray(ticket.historial) && ticket.historial.length) {
     const names = new Set(ticket.historial.map(e => e.imagen).filter(Boolean));
     for (const name of names) {
@@ -412,20 +600,19 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
       }
     }
   }
-  // Logo CID si corresponde
-  const { attachment: _logoAgain } = buildLogoBlock(); // ya lo creamos arriba, pero por seguridad mantenemos uno
-  if (_logoAgain && !attachments.find(a => a.cid === 'brandLogo')) {
-    attachments.push(_logoAgain);
+  const { attachment: logoAtt } = buildLogoBlock();
+  if (logoAtt && !attachments.find(a => a.cid === 'brandLogo')) {
+    attachments.push(logoAtt);
   }
 
   const mailOptions = {
-    from: `"${BRAND_NAME} – Sistema de Tickets" <${EMAIL_FROM}>`,
+    from: `"${BRAND_NAME}" <${EMAIL_FROM}>`,
     to: Array.isArray(destinatarios) ? destinatarios.join(',') : destinatarios,
     cc: MAIL_CC || undefined,
     bcc: MAIL_BCC || undefined,
     subject,
     headers: {
-      'X-Ticket-Id': String(numero),
+      'X-Tarea-Id': String(numero),
       'List-Unsubscribe': `<mailto:${EMAIL_FROM}?subject=unsubscribe>`
     },
     replyTo: process.env.NO_REPLY || EMAIL_FROM,
@@ -436,13 +623,13 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`Correo enviado a: ${mailOptions.to}`);
+    console.log(`Correo enviado a: ${mailOptions.to} - Tipo: ${accion} - Tarea: #${numero}`);
   } catch (error) {
     console.error('Error al enviar el correo:', error?.message || error);
   }
 };
 
-/* Útil p/otros mails simples (reset pass, etc.) */
+/* Útil para otros mails simples */
 async function enviarCorreo(to, subject, text, html = null) {
   const mailOptions = {
     from: EMAIL_FROM,
@@ -453,4 +640,5 @@ async function enviarCorreo(to, subject, text, html = null) {
   };
   return transporter.sendMail(mailOptions);
 }
+
 module.exports.enviarCorreo = enviarCorreo;

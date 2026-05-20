@@ -1,0 +1,359 @@
+.asignar-usuarios {
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+}
+
+.asignar-usuarios.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.asignar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.asignados-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.asignados-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  background: color-mix(in oklab, var(--panel) 50%, transparent);
+  border-radius: 8px;
+}
+
+.asignado-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--panel);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.asignado-item:hover {
+  border-color: var(--brand);
+}
+
+.asignado-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.asignado-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+}
+
+.asignado-avatar.rol-admin {
+  background: color-mix(in oklab, var(--err) 20%, transparent);
+  color: var(--err);
+}
+
+.asignado-avatar.rol-soporte {
+  background: color-mix(in oklab, var(--warn) 20%, transparent);
+  color: var(--warn);
+}
+
+.asignado-avatar.rol-usuario {
+  background: color-mix(in oklab, var(--ok) 20%, transparent);
+  color: var(--ok);
+}
+
+.asignado-details {
+  flex: 1;
+}
+
+.asignado-nombre {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.asignado-email {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.asignado-rol {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.asignado-rol.rol-admin {
+  background: color-mix(in oklab, var(--err) 15%, transparent);
+  color: var(--err);
+}
+
+.asignado-rol.rol-soporte {
+  background: color-mix(in oklab, var(--warn) 15%, transparent);
+  color: var(--warn);
+}
+
+.asignado-rol.rol-usuario {
+  background: color-mix(in oklab, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+
+.btn-desasignar {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-desasignar:hover {
+  background: color-mix(in oklab, var(--err) 15%, transparent);
+  color: var(--err);
+}
+
+.btn-asignar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-asignar:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: color-mix(in oklab, var(--brand) 5%, transparent);
+}
+
+.btn-asignar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.asignar-selector {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.selector-header button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selector-header button:hover {
+  background: color-mix(in oklab, var(--border) 50%, transparent);
+  color: var(--text);
+}
+
+.selector-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selector-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selector-item:hover {
+  border-color: var(--brand);
+  background: color-mix(in oklab, var(--brand) 5%, transparent);
+}
+
+.selector-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selector-avatar.rol-admin {
+  background: color-mix(in oklab, var(--err) 20%, transparent);
+  color: var(--err);
+}
+
+.selector-avatar.rol-soporte {
+  background: color-mix(in oklab, var(--warn) 20%, transparent);
+  color: var(--warn);
+}
+
+.selector-avatar.rol-usuario {
+  background: color-mix(in oklab, var(--ok) 20%, transparent);
+  color: var(--ok);
+}
+
+.selector-info {
+  flex: 1;
+}
+
+.selector-nombre {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.selector-email {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.selector-rol {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.selector-rol.rol-admin {
+  background: color-mix(in oklab, var(--err) 15%, transparent);
+  color: var(--err);
+}
+
+.selector-rol.rol-soporte {
+  background: color-mix(in oklab, var(--warn) 15%, transparent);
+  color: var(--warn);
+}
+
+.selector-rol.rol-usuario {
+  background: color-mix(in oklab, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+
+.selector-plus {
+  color: var(--brand);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.selector-item:hover .selector-plus {
+  opacity: 1;
+}
+
+.selector-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.asignar-mensaje {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.asignar-mensaje.success {
+  background: color-mix(in oklab, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+
+.asignar-mensaje.error {
+  background: color-mix(in oklab, var(--err) 15%, transparent);
+  color: var(--err);
+}
+
+/* Scrollbar */
+.asignados-list::-webkit-scrollbar,
+.selector-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.asignados-list::-webkit-scrollbar-track,
+.selector-list::-webkit-scrollbar-track {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+.asignados-list::-webkit-scrollbar-thumb,
+.selector-list::-webkit-scrollbar-thumb {
+  background: var(--brand);
+  border-radius: 10px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

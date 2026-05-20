@@ -1,0 +1,294 @@
+.calendar-view-container {
+  background: var(--panel, #ffffff);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow, 0 4px 20px rgba(0, 0, 0, 0.1));
+}
+
+/* ===== BARRA DE NAVEGACIÓN ===== */
+.calendar-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.calendar-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--panel-2, #f1f5f9);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text, #1e293b);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+  background: color-mix(in oklab, var(--brand) 15%, transparent);
+  border-color: var(--brand);
+  transform: translateY(-1px);
+}
+
+.today-btn {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: white;
+}
+
+.today-btn:hover {
+  background: color-mix(in oklab, var(--brand) 85%, #000);
+}
+
+.calendar-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+  text-transform: capitalize;
+}
+
+.calendar-nav-right {
+  display: flex;
+  align-items: center;
+}
+
+.view-buttons {
+  display: flex;
+  gap: 4px;
+  background: var(--panel-2, #f1f5f9);
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.view-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-btn:hover {
+  background: color-mix(in oklab, var(--brand) 15%, transparent);
+  color: var(--brand);
+}
+
+.view-btn.active {
+  background: var(--brand);
+  color: white;
+}
+
+/* ===== LEYENDA ===== */
+.calendar-legend-bar {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.legend-alta {
+  background-color: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+}
+
+.legend-media {
+  background-color: #f59e0b;
+  box-shadow: 0 0 4px #f59e0b;
+}
+
+.legend-baja {
+  background-color: #10b981;
+  box-shadow: 0 0 4px #10b981;
+}
+
+.legend-vencida {
+  background-color: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+  opacity: 0.7;
+}
+
+/* ===== CONTENEDOR DEL CALENDARIO ===== */
+.calendar-wrapper {
+  min-height: 500px;
+}
+
+/* ===== ESTILOS DEL CALENDARIO ===== */
+.rbc-calendar {
+  font-family: inherit;
+  background: var(--panel, #ffffff);
+}
+
+.rbc-header {
+  padding: 12px;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--panel) 95%, var(--brand));
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  color: var(--text, #1e293b);
+}
+
+.rbc-off-range-bg {
+  background: color-mix(in oklab, var(--panel) 98%, #000);
+}
+
+.rbc-off-range {
+  color: var(--text-secondary, #94a3b8);
+}
+
+.rbc-today {
+  background: color-mix(in oklab, var(--brand) 8%, transparent);
+}
+
+.rbc-event {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.rbc-event:hover {
+  transform: scale(1.02);
+  filter: brightness(1.05);
+  z-index: 10;
+}
+
+.rbc-event-content {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.rbc-month-view,
+.rbc-time-view,
+.rbc-agenda-view {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rbc-agenda-table {
+  background: var(--panel, #ffffff);
+}
+
+.rbc-agenda-date-cell,
+.rbc-agenda-time-cell,
+.rbc-agenda-event-cell {
+  padding: 12px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  color: var(--text, #1e293b);
+}
+
+.rbc-agenda-event-cell {
+  cursor: pointer;
+}
+
+.rbc-agenda-event-cell:hover {
+  background: color-mix(in oklab, var(--brand) 8%, transparent);
+}
+
+.rbc-row-segment {
+  padding: 0 2px;
+}
+
+.rbc-show-more {
+  background: color-mix(in oklab, var(--brand) 15%, transparent);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* ===== ESTADO VACÍO ===== */
+.calendar-empty {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--panel, #ffffff);
+  border-radius: 16px;
+  color: var(--text-secondary, #64748b);
+}
+
+.calendar-empty svg {
+  color: var(--muted, #94a3b8);
+  margin-bottom: 16px;
+}
+
+.calendar-empty h3 {
+  margin-bottom: 8px;
+  color: var(--text, #1e293b);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .calendar-view-container {
+    padding: 12px;
+  }
+  
+  .calendar-navbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .calendar-nav-left {
+    justify-content: center;
+  }
+  
+  .calendar-title {
+    text-align: center;
+  }
+  
+  .calendar-nav-right {
+    justify-content: center;
+  }
+  
+  .view-buttons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .calendar-legend {
+    justify-content: center;
+    gap: 12px;
+    font-size: 10px;
+  }
+  
+  .rbc-header {
+    padding: 8px;
+    font-size: 11px;
+  }
+  
+  .rbc-event {
+    font-size: 9px;
+  }
+}

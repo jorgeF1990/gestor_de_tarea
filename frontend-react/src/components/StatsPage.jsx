@@ -38,7 +38,6 @@ const guessAuthor = (t) =>
   t.creador || t.usuario || t.cliente || t.createdBy || t.autor || t?.usuario_id?.email || "desconocido";
 
 const guessType = (t) => {
-  // Heurística por palabras clave si no hay tipo/categoria
   const direct = t.tipo || t.categoria || t.category;
   if (direct) return direct;
 
@@ -136,19 +135,33 @@ const inferResolvedAt = (t) => {
   return null;
 };
 
+/* ========= NUEVO: Inferir fecha de vencimiento ========= */
+const inferDueDate = (t) => {
+  const direct = t.fecha_vencimiento || t.dueDate || t.vencimiento;
+  if (direct) return direct;
+  
+  if (Array.isArray(t.historial) && t.historial.length) {
+    const h = t.historial.slice().sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const dueEntry = h.find(x => 
+      x.comentario?.toLowerCase().includes("vencimiento") ||
+      x.comentario?.toLowerCase().includes("due date")
+    );
+    if (dueEntry?.fecha) return dueEntry.fecha;
+  }
+  return null;
+};
+
 export default function StatsPage({ tickets: propTickets }) {
   const [tickets, setTickets] = useState(propTickets || []);
   const [loading, setLoading] = useState(false);
 
   // Filtros de periodo
-  const [preset, setPreset] = useState("30"); // "7" | "30" | "90" | "custom"
-  const [start, setStart] = useState(""); // YYYY-MM-DD
-  const [end, setEnd] = useState("");     // YYYY-MM-DD
+  const [preset, setPreset] = useState("30");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
 
-  // Ref del contenedor a exportar
   const statsRef = useRef(null);
 
-  /* ====== Carga (si no viene por props) ====== */
   useEffect(() => {
     if (propTickets) return;
     let mounted = true;
@@ -170,7 +183,6 @@ export default function StatsPage({ tickets: propTickets }) {
     return () => { mounted = false; };
   }, [propTickets]);
 
-  /* ====== Determinar rango de fechas ====== */
   const todayKey = toDayKey(new Date());
   const [rangeStart, rangeEnd] = useMemo(() => {
     if (preset !== "custom") {
@@ -194,7 +206,6 @@ export default function StatsPage({ tickets: propTickets }) {
     [rangeStart, rangeEnd]
   );
 
-  /* ====== Datos filtrados por rango ====== */
   const filtered = useMemo(() => {
     if (!tickets?.length) return [];
     return tickets.filter((t) => {
@@ -203,7 +214,6 @@ export default function StatsPage({ tickets: propTickets }) {
     });
   }, [tickets, inRange]);
 
-  /* ====== Agregaciones / KPIs ====== */
   const {
     byState,
     byType,
@@ -220,6 +230,9 @@ export default function StatsPage({ tickets: propTickets }) {
     dailyAvgResolution,
     countFirstResponse,
     countResolution,
+    vencidas,
+    vencenHoy,
+    vencenSemana,
   } = useMemo(() => {
     const byState = {};
     const byType = {};
@@ -237,6 +250,15 @@ export default function StatsPage({ tickets: propTickets }) {
     const frDailyCount = {};
     const rsDailySum = {};
     const rsDailyCount = {};
+
+    // Variables para vencimiento
+    let vencidasCount = 0;
+    let vencenHoyCount = 0;
+    let vencenSemanaCount = 0;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const en7Dias = new Date(hoy);
+    en7Dias.setDate(hoy.getDate() + 7);
 
     filtered.forEach((t) => {
       const st   = guessState(t) || "sin_estado";
@@ -260,6 +282,23 @@ export default function StatsPage({ tickets: propTickets }) {
           stackedPerDay[key][st] = (stackedPerDay[key][st] || 0) + 1;
 
           byWeekday[d.getDay()] = (byWeekday[d.getDay()] || 0) + 1;
+        }
+      }
+
+      // Contar tareas vencidas
+      const dueDate = inferDueDate(t);
+      const isClosed = st === 'cerrado' || st === 'resuelto';
+      
+      if (dueDate && !isClosed) {
+        const fechaVen = new Date(dueDate);
+        fechaVen.setHours(0, 0, 0, 0);
+        
+        if (fechaVen < hoy) {
+          vencidasCount++;
+        } else if (fechaVen.getTime() === hoy.getTime()) {
+          vencenHoyCount++;
+        } else if (fechaVen <= en7Dias) {
+          vencenSemanaCount++;
         }
       }
 
@@ -325,10 +364,12 @@ export default function StatsPage({ tickets: propTickets }) {
       dailyAvgResolution,
       countFirstResponse,
       countResolution,
+      vencidas: vencidasCount,
+      vencenHoy: vencenHoyCount,
+      vencenSemana: vencenSemanaCount,
     };
   }, [filtered]);
 
-  /* ====== Arrays ordenados para gráficas ====== */
   const dayKeysSorted = useMemo(() => Object.keys(perDay).sort(), [perDay]);
   const perDayCounts  = useMemo(() => dayKeysSorted.map((k) => perDay[k]), [dayKeysSorted, perDay]);
 
@@ -370,17 +411,17 @@ export default function StatsPage({ tickets: propTickets }) {
   const rsDailyLabels = useMemo(() => Object.keys(dailyAvgResolution).sort(), [dailyAvgResolution]);
   const rsDailyHours  = useMemo(() => rsDailyLabels.map((k) => (dailyAvgResolution[k] || 0) / 36e5), [rsDailyLabels, dailyAvgResolution]);
 
-  /* ====== CSV export: tickets ====== */
   const exportCSV = () => {
     const headers = [
       "numero_ticket","asunto","estado","prioridad","usuario",
-      "created_at","first_response_at","resolved_at",
+      "created_at","first_response_at","resolved_at","due_date",
       "t_first_response_h","t_resolution_h","tipo",
     ];
     const rows = filtered.map((t) => {
       const created = inferCreatedAt(t);
       const fr = inferFirstResponseAt(t);
       const rs = inferResolvedAt(t);
+      const due = inferDueDate(t);
       const diffFR = fr && created ? (new Date(fr) - new Date(created)) / 36e5 : "";
       const diffRS = rs && created ? (new Date(rs) - new Date(created)) / 36e5 : "";
       return [
@@ -392,6 +433,7 @@ export default function StatsPage({ tickets: propTickets }) {
         created ? new Date(created).toISOString() : "",
         fr ? new Date(fr).toISOString() : "",
         rs ? new Date(rs).toISOString() : "",
+        due ? new Date(due).toISOString() : "",
         diffFR === "" ? "" : diffFR.toFixed(2),
         diffRS === "" ? "" : diffRS.toFixed(2),
         guessType(t),
@@ -401,7 +443,6 @@ export default function StatsPage({ tickets: propTickets }) {
     downloadBlob(csv, `tickets_${rangeStart}_a_${rangeEnd}.csv`, "text/csv;charset=utf-8;");
   };
 
-  /* ====== CSV export: agregados por día ====== */
   const exportAggregatesCSV = () => {
     const baseHeaders = ["date","tickets_total","avg_first_response_h","avg_resolution_h"];
     const estadoHeaders = estadosPresentes.map((e) => `estado_${e}`);
@@ -435,13 +476,11 @@ export default function StatsPage({ tickets: propTickets }) {
     URL.revokeObjectURL(url);
   };
 
-  /* ====== Navegación al hacer click ====== */
   const navigateToDate = (isoDay) => {
     const url = `/tickets?date=${isoDay}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  /* ====== Exportar PDF (multipágina, alta resolución) ====== */
   const exportPDF = async () => {
     if (!statsRef.current) return;
     window.scrollTo(0, 0);
@@ -481,13 +520,10 @@ export default function StatsPage({ tickets: propTickets }) {
     pdf.save(`stats_${rangeStart}_a_${rangeEnd}.pdf`);
   };
 
-  /* ====== Imprimir (vista limpia) ====== */
   const printPage = () => window.print();
 
-  /* ====== Loading ====== */
   if (loading) return <div className="stats-loading">Cargando estadísticas…</div>;
 
-  /* ====== Render ====== */
   return (
     <div className="stats-page" ref={statsRef}>
       <div className="stats-topbar no-print">
@@ -532,6 +568,12 @@ export default function StatsPage({ tickets: propTickets }) {
         <div className="kpi"><div className="kpi-title">Pendientes</div><div className="kpi-value">{totals.pendientes}</div></div>
         <div className="kpi"><div className="kpi-title">En proceso</div><div className="kpi-value">{totals.enProceso}</div></div>
         <div className="kpi"><div className="kpi-title">Resueltos</div><div className="kpi-value">{totals.resueltos}</div></div>
+        
+        {/* KPIs de vencimiento */}
+        <div className="kpi kpi-vencido"><div className="kpi-title"> Vencidas</div><div className="kpi-value">{vencidas}</div></div>
+        <div className="kpi kpi-hoy"><div className="kpi-title"> Vencen hoy</div><div className="kpi-value">{vencenHoy}</div></div>
+        <div className="kpi kpi-semana"><div className="kpi-title"> Próxima semana</div><div className="kpi-value">{vencenSemana}</div></div>
+        
         <div className="kpi"><div className="kpi-title">FCR</div><div className="kpi-value">{`${clamp(firstContactResolution, 0, 100).toFixed(1)}%`}</div></div>
         <div className="kpi"><div className="kpi-title">1ª respuesta</div><div className="kpi-value">{formatHours(avgFirstResponse)}</div></div>
         <div className="kpi"><div className="kpi-title">Resolución</div><div className="kpi-value">{formatHours(avgResolution)}</div></div>
@@ -540,7 +582,7 @@ export default function StatsPage({ tickets: propTickets }) {
       {/* Tickets por día */}
       <div className="charts-row">
         <div className="chart-card wide avoid-break">
-          <div className="card-title">Tickets/día (creados)</div>
+          <div className="card-title">Tareas/día (creados)</div>
           <Line
             data={{
               labels: dayKeysSorted,
@@ -618,7 +660,65 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
       </div>
 
-      {/* Apilado por estado + prioridad */}
+      {/* Nueva gráfica de vencimiento */}
+      <div className="charts-row">
+        <div className="chart-card avoid-break">
+          <div className="card-title"> Estado de vencimiento</div>
+          <Doughnut
+            data={{
+              labels: ['Vencidas', 'Vencen hoy', 'Próxima semana', 'Sin vencimiento próximo'],
+              datasets: [{
+                data: [vencidas, vencenHoy, vencenSemana, totals.total - (vencidas + vencenHoy + vencenSemana)],
+                backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'],
+              }],
+            }}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                  callbacks: {
+                    label(ctx) {
+                      const total = totals.total;
+                      const val = ctx.parsed;
+                      const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
+                      return `${ctx.label}: ${val} (${pct}%)`;
+                    },
+                  },
+                },
+              },
+            }}
+          />
+        </div>
+
+        <div className="chart-card avoid-break">
+          <div className="card-title">Distribución por prioridad</div>
+          <Pie
+            data={{
+              labels: prioLabels,
+              datasets: [{ data: prioCounts, backgroundColor: prioLabels.map((_, i) => PALETTE[i % PALETTE.length]) }],
+            }}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                  callbacks: {
+                    label(ctx) {
+                      const total = prioCounts.reduce((a, b) => a + b, 0);
+                      const val = ctx.parsed;
+                      const pct = total ? ((val / total) * 100).toFixed(1) : "0.0";
+                      return `${ctx.label}: ${val} (${pct}%)`;
+                    },
+                  },
+                },
+              },
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Apilado por estado */}
       <div className="charts-row">
         <div className="chart-card wide avoid-break">
           <div className="card-title">Mezcla por estado (apilado por día)</div>
@@ -704,7 +804,7 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
 
         <div className="chart-card avoid-break">
-          <div className="card-title">Tickets por día de la semana</div>
+          <div className="card-title">Tareas por día de la semana</div>
           <Bar
             data={{
               labels: weekdayLabels,
@@ -722,9 +822,8 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
       </div>
 
-      {/* Tiempos diarios con SLA (condicionales) */}
+      {/* Tiempos diarios con SLA */}
       <div className="charts-row">
-        {/* 1ª respuesta */}
         {countFirstResponse > 0 ? (
           <div className="chart-card wide avoid-break">
             <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
@@ -783,11 +882,10 @@ export default function StatsPage({ tickets: propTickets }) {
         ) : (
           <div className="chart-card wide avoid-break">
             <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
-            <div className="empty">No hay tickets con 1ª respuesta registrada.</div>
+            <div className="empty">No hay tareas con 1ª respuesta registrada.</div>
           </div>
         )}
 
-        {/* Resolución */}
         {countResolution > 0 ? (
           <div className="chart-card avoid-break">
             <div className="card-title">Tiempo promedio de resolución (h) por día</div>
@@ -846,7 +944,7 @@ export default function StatsPage({ tickets: propTickets }) {
         ) : (
           <div className="chart-card avoid-break">
             <div className="card-title">Tiempo promedio de resolución (h) por día</div>
-            <div className="empty">No hay tickets resueltos/cerrados en el rango.</div>
+            <div className="empty">No hay tareas resueltos/cerrados en el rango.</div>
           </div>
         )}
       </div>

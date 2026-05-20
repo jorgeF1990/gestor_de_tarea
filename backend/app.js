@@ -1,4 +1,3 @@
-// backend/app.js
 require('dotenv').config();
 
 // Dependencias
@@ -6,6 +5,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+
+// Scheduler
+const { startScheduler } = require('./scheduler/cron.scheduler.js');
 
 // Model usado por la ruta GET /auth/reset/:token (form HTML opcional)
 const User = require('./models/User');
@@ -16,9 +18,9 @@ const ticketRoutes = require('./routes/ticket.routes');
 
 const app = express();
 
-/* =========================
-   CORS
-   ========================= */
+const adminRoutes = require('./routes/admin.routes');
+
+/* =========================   CORS   ========================= */
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim();
 app.use(cors({
   origin: FRONTEND_URL || true,
@@ -27,57 +29,108 @@ app.use(cors({
   credentials: true
 }));
 
-/* =========================
-   Parsers
-   ========================= */
+/* =========================   Parsers   ========================= */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* =========================
-   Estáticos (logo y uploads)
-   ========================= */
-app.use(express.static(path.join(__dirname, 'public')));              // => /logo.png
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // => /uploads/<archivo>
+/* =========================   Estáticos (logo y uploads)   ========================= */
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-/* =========================
-   MongoDB
-   ========================= */
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB conectado'))
+app.use('/admin', adminRoutes);
+
+/* =========================   MongoDB - CONEXIÓN ROBUSTA   ========================= */
+const mongooseOptions = {
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+  heartbeatFrequencyMS: 10000,
+  retryWrites: true,
+  retryReads: true,
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  maxIdleTimeMS: 60000,
+  family: 4
+};
+
+mongoose.connect(process.env.MONGO_URI, mongooseOptions)
+  .then(() => {
+    console.log('MongoDB conectado correctamente');
+    console.log('Base de datos:', mongoose.connection.name);
+    startScheduler();
+  })
   .catch(err => {
     console.error('Error de conexión a MongoDB:', err.message);
     process.exit(1);
   });
 
-/* =========================
-   Rutas principales
-   ========================= */
-app.use('/auth', authRoutes);       // /auth/*
-app.use('/tickets', ticketRoutes);  // /tickets/*
+  // Mantener viva la conexión a MongoDB (ping cada 1 minuto)
+setInterval(async () => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.db.admin().ping();
+    }
+  } catch (err) {
+    console.warn('⚠️ Ping a MongoDB falló:', err.message);
+  }
+}, 60000);
 
-/* =========================
-   Utilidades
-   ========================= */
+// Manejar eventos de conexión
+mongoose.connection.on('connected', () => {
+  console.log('✅ Mongoose conectado a MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Error de conexión Mongoose:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️ Mongoose desconectado de MongoDB');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('🔄 Mongoose reconectado a MongoDB');
+});
+
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  console.log('MongoDB desconectado por cierre de la aplicación');
+  process.exit(0);
+});
+
+/* =========================   Rutas principales   ========================= */
+app.use('/auth', authRoutes);
+app.use('/tickets', ticketRoutes);
+
+/* =========================   Utilidades   ========================= */
 app.get('/', (_req, res) => res.send('Backend funcionando correctamente'));
 
 app.get('/ping-db', async (_req, res) => {
   try {
     await mongoose.connection.db.admin().ping();
-    res.send('MongoDB responde correctamente');
+    res.json({ 
+      ok: true, 
+      message: 'MongoDB responde correctamente',
+      readyState: mongoose.connection.readyState,
+      readyStateText: ['desconectado', 'conectado', 'conectando', 'desconectando'][mongoose.connection.readyState] || 'desconocido'
+    });
   } catch (err) {
     console.error('Error al hacer ping a MongoDB:', err.message);
-    res.status(500).send('Error al conectar con MongoDB');
+    res.status(500).json({ 
+      ok: false, 
+      error: 'Error al conectar con MongoDB',
+      readyState: mongoose.connection.readyState
+    });
   }
 });
 
 app.get('/health', (_req, res) =>
-  res.json({ ok: true, version: process.env.VITE_VERSION || 'desconocida' })
-);
+  res.json({ 
+    ok: true, 
+    version: process.env.VITE_VERSION || 'desconocida',
+    mongodb: mongoose.connection.readyState === 1 ? 'conectado' : 'desconectado'
+  }));
 
-/**
- * Form HTML simple para restablecer contraseña (opcional).
- * Sirve GET /auth/reset/:token y envía el form al POST /auth/reset/:token.
- */
 app.get('/auth/reset/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -120,11 +173,25 @@ app.get('/auth/reset/:token', async (req, res) => {
   }
 });
 
-/* =========================
-   Inicio servidor
-   ========================= */
+/* =========================   Inicio servidor   ========================= */
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+  console.log(`\n${'='.repeat(50)}`);
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`📋 Rutas disponibles:`);
+  console.log(`  POST   /tickets        - Crear tarea`);
+  console.log(`  GET    /tickets        - Listar tareas`);
+  console.log(`  PUT    /tickets/:id/estado - Actualizar estado`);
+  console.log(`  GET    /tickets/:id/calendar - Descargar ICS`);
+  console.log(`  GET    /ping-db        - Verificar conexión MongoDB`);
+  console.log(`  GET    /health         - Health check`);
+  console.log(`\n📧 Sistema de notificaciones:`);
+  console.log(`  - 30, 21, 14, 7, 3, 1 días antes del vencimiento`);
+  console.log(`  - El mismo día del vencimiento`);
+  console.log(`  - Recordatorios post-vencimiento (1, 3, 7, 14, 30 días)`);
+  console.log(`  - Notificaciones de asignación/desasignación`);
+  console.log(`  - Notificaciones de comentarios`);
+  console.log(`${'='.repeat(50)}\n`);
 });
+
 module.exports = app;

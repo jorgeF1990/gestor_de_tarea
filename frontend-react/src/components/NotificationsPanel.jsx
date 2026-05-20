@@ -48,7 +48,7 @@ export default function NotificationsPanel({
                     </button>
                   )}
                   <a className="btn" href={`/tickets/${n.ticketId || ""}`}>
-                    Abrir ticket
+                    Abrir tarea
                   </a>
                 </div>
               </li>

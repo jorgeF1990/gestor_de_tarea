@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
-import AppShell from "./layout/AppShell"; // tu layout lateral que ya tenés
+import AppShell from "./layout/AppShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Home from "./components/Home";
@@ -13,6 +13,7 @@ import Tickets from "./components/Tickets";
 import Recuperar from "./components/Recuperar";
 import ResetPassword from "./components/ResetPassword";
 import StatsPage from "./components/StatsPage";
+import TareaDetail from "./components/TareaDetail"; // ← NUEVO COMPONENTE
 
 export default function App() {
   return (
@@ -22,7 +23,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
 
-            {/* Público (si ya está logueado, igual puede entrar; si querés, podríamos redirigir) */}
+            {/* Público */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
@@ -32,6 +33,26 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Tickets />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* NUEVO: Ruta para ver una tarea individual desde el email */}
+            <Route
+              path="/tareas/:id"
+              element={
+                <ProtectedRoute>
+                  <TareaDetail />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* NUEVO: Ruta para silenciar notificaciones desde el email */}
+            <Route
+              path="/tareas/:id/silenciar"
+              element={
+                <ProtectedRoute>
+                  <TareaDetail />
                 </ProtectedRoute>
               }
             />

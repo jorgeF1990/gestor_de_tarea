@@ -1,12 +1,69 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import './Tickets.css';
+import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
+import CalendarView from './CalendarView';
+import AsignarUsuarios from './AsignarUsuarios';
+
+
+// Importar iconos profesionales de Lucide React
+import {
+  Search,
+  RefreshCw,
+  Bell,
+  BellRing,
+  Clock,
+  Calendar,
+  CalendarDays,
+  CalendarClock,
+  AlertCircle,
+  CheckCircle,
+  Flag,
+  TrendingUp,
+  User,
+  MessageSquare,
+  Image,
+  Paperclip,
+  Send,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Sun,
+  Moon,
+  Loader2,
+  Inbox,
+  Ticket,
+  Activity,
+  Eye,
+  EyeOff,
+  Lock,
+  FolderOpen,
+  Archive,
+  Save,
+  Upload,
+  FileText,
+  Tag,
+  Info,
+  Settings,
+  LogOut,
+  Home,
+  LayoutDashboard,
+  BarChart3,
+  Package,
+  Layers,
+  GripVertical,
+  Plus,
+  Minus,
+  Filter,
+  LayoutList,
+  KanbanSquare
+} from 'lucide-react';
 
 const API = import.meta.env.VITE_BACKEND_URL;
 const headers = (token) => ({ Authorization: `Bearer ${token}` });
 
-const estadoOps = ['abierto','pendiente','en_proceso','resuelto','cerrado','reabierto','cancelado'];
-const prioOps = ['baja','media','alta'];
+const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado'];
+const prioOps = ['baja', 'media', 'alta'];
 
 /** Última actividad (ms) de un ticket */
 const getActivityTs = (t) => {
@@ -33,6 +90,31 @@ const lastISOFromTicket = (t) => {
   return null;
 };
 
+/** Formatear fecha con hora */
+const formatearFechaHora = (fecha) => {
+  if (!fecha) return '—';
+  return new Date(fecha).toLocaleString('es-AR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const formatearFechaCorta = (fecha) => {
+  if (!fecha) return '—';
+  return new Date(fecha).toLocaleDateString('es-AR');
+};
+
+const formatearHora = (fecha) => {
+  if (!fecha) return '—';
+  return new Date(fecha).toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 export default function Tickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -55,14 +137,22 @@ export default function Tickets() {
 
   // comentario (solo comentar, sin cambiar estado/prioridad)
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ comentario:'', archivo:null });
+  const [form, setForm] = useState({ comentario: '', archivo: null });
 
   // tema (CLARO por defecto)
   const [theme, setTheme] = useState(() => localStorage.getItem('tickets-theme') || 'light');
+
+  // NUEVO: Modo de vista (lista o calendario)
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('tickets-view-mode') || 'lista');
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
     localStorage.setItem('tickets-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('tickets-view-mode', viewMode);
+  }, [viewMode]);
 
   const token = localStorage.getItem('token');
 
@@ -70,7 +160,7 @@ export default function Tickets() {
      Novedades (polling + diff por ticket)
      ====================== */
   const [newsCount, setNewsCount] = useState(0);
-  const [changesMap, setChangesMap] = useState({}); // { id: {nuevo, comentario, estado, prioridad} }
+  const [changesMap, setChangesMap] = useState({});
   const [toasts, setToasts] = useState([]);
   const audioRef = useRef(null);
   const SEEN_KEY = 'tickets_seen_snapshot:v1';
@@ -79,7 +169,7 @@ export default function Tickets() {
     try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch { return {}; }
   };
   const setSeen = (snap) => {
-    try { localStorage.setItem(SEEN_KEY, JSON.stringify(snap)); } catch {}
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(snap)); } catch { }
   };
   const buildSnap = (list) => {
     const snap = {};
@@ -96,7 +186,7 @@ export default function Tickets() {
   const computeChanges = (prev, curr, t) => {
     const p = prev?.[t._id];
     const c = curr?.[t._id];
-    const out = { nuevo:false, comentario:false, estado:false, prioridad:false };
+    const out = { nuevo: false, comentario: false, estado: false, prioridad: false };
 
     if (!p) {
       out.nuevo = true;
@@ -110,7 +200,7 @@ export default function Tickets() {
   };
 
   const showToast = (msg) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setToasts(prev => [...prev, { id, msg }]);
     try {
       if (!audioRef.current) {
@@ -118,12 +208,12 @@ export default function Tickets() {
         audioRef.current.volume = 0.25;
       }
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(()=>{});
-    } catch {}
+      audioRef.current.play().catch(() => { });
+    } catch { }
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
   };
 
-  const cargar = async (silent=false) => {
+  const cargar = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -134,9 +224,9 @@ export default function Tickets() {
         headers: headers(token),
       });
 
-      const ordered = (data || []).slice().sort((a,b) => getActivityTs(b) - getActivityTs(a));
+      // ORDENAR POR ACTIVIDAD (más reciente primero)
+      const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
-      // Diff por ticket
       const prev = getSeen();
       const curr = buildSnap(ordered);
       const newChanges = {};
@@ -151,7 +241,6 @@ export default function Tickets() {
         }
       }
 
-      // Si es polling silencioso y hay cambios, mostramos toast y badge
       if (changesCount > 0 && silent) {
         setNewsCount(changesCount);
         showToast(`🔔 ${changesCount} ticket(s) con novedades`);
@@ -167,10 +256,8 @@ export default function Tickets() {
     }
   };
 
-  // carga inicial + filtros
-  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [fEstado, fPrio]);
+  useEffect(() => { cargar(); }, [fEstado, fPrio]);
 
-  // polling cada 20s (silencioso)
   useEffect(() => {
     const id = setInterval(() => cargar(true), 20000);
     return () => clearInterval(id);
@@ -183,18 +270,14 @@ export default function Tickets() {
     setChangesMap({});
   };
 
-  /* ========= NUEVO: marcado optimista al abrir ========= */
   const markAsSeenLocal = (ticket) => {
-    // 1) quitar chips de ese ticket en UI
     setChangesMap(prev => {
       if (!prev[ticket._id]) return prev;
       const n = { ...prev };
       delete n[ticket._id];
       return n;
     });
-    // 2) bajar el badge de novedades
     setNewsCount(n => Math.max(0, n - 1));
-    // 3) actualizar snapshot localStorage para ese ticket
     const prevSnap = getSeen();
     const nextSnap = {
       ...prevSnap,
@@ -208,47 +291,83 @@ export default function Tickets() {
   };
 
   /* ======================
-     Búsqueda / orden / paginado
+     Búsqueda / orden / paginado (MEJORADO)
      ====================== */
   const filtered = useMemo(() => {
-    const text = q.trim().toLowerCase();
-    let arr = tickets.filter(t => {
-      if (!text) return true;
-      return (
-        (t.numero_ticket || '').toString().includes(text) ||
-        (t.asunto || '').toLowerCase().includes(text) ||
-        (t.descripcion || '').toLowerCase().includes(text) ||
-        (t.usuario_id?.email || '').toLowerCase().includes(text)
-      );
-    });
+    const textoBusqueda = q.trim().toLowerCase();
 
-    arr.sort((a, b) => {
+    // Obtener rol del usuario desde el token
+    const userRol = (() => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.rol || 'usuario';
+        }
+      } catch {}
+      return 'usuario';
+    })();
+
+    // PARTIR del array original que ya viene ordenado por actividad
+    let arr;
+
+    if (!textoBusqueda) {
+      // Sin búsqueda: usar el array tal cual (ya ordenado por getActivityTs desc)
+      arr = [...tickets];
+    } else {
+      // Con búsqueda: filtrar MANTENIENDO el orden original
+      arr = tickets.filter(t => {
+        const numeroTicket = (t.numero_ticket || '').toString().toLowerCase();
+        const asunto = (t.asunto || '').toLowerCase();
+        const descripcion = (t.descripcion || '').toLowerCase();
+        const email = (t.usuario_id?.email || '').toLowerCase();
+
+        return numeroTicket.includes(textoBusqueda) ||
+               asunto.includes(textoBusqueda) ||
+               descripcion.includes(textoBusqueda) ||
+               email.includes(textoBusqueda);
+      });
+    }
+
+    // ========== EXCLUIR TAREAS ARCHIVADAS PARA USUARIOS NO-ADMIN ==========
+    if (userRol !== 'admin' && userRol !== 'soporte') {
+      arr = arr.filter(t => t.estado !== 'archivada');
+    }
+
+    // SOLO reordenar si el usuario eligió otro criterio de ordenamiento
+    if (sort.by !== 'actividad') {
       const dir = sort.dir === 'asc' ? 1 : -1;
 
-      const va =
-        sort.by === 'actividad' ? getActivityTs(a) :
-        sort.by === 'createdAt' ? new Date(a.createdAt || a.fecha_creacion || 0).getTime() :
-        sort.by === 'estado' ? (a.estado || '') :
-        sort.by === 'prioridad' ? (a.prioridad || '') :
-        (a.numero_ticket || 0);
+      arr.sort((a, b) => {
+        let va, vb;
+        if (sort.by === 'fecha_vencimiento') {
+          va = a.fecha_vencimiento ? new Date(a.fecha_vencimiento).getTime() : 0;
+          vb = b.fecha_vencimiento ? new Date(b.fecha_vencimiento).getTime() : 0;
+        } else if (sort.by === 'createdAt') {
+          va = new Date(a.createdAt || a.fecha_creacion || 0).getTime();
+          vb = new Date(b.createdAt || b.fecha_creacion || 0).getTime();
+        } else if (sort.by === 'estado') {
+          va = a.estado || '';
+          vb = b.estado || '';
+        } else if (sort.by === 'prioridad') {
+          va = a.prioridad || '';
+          vb = b.prioridad || '';
+        } else {
+          va = a.numero_ticket || 0;
+          vb = b.numero_ticket || 0;
+        }
 
-      const vb =
-        sort.by === 'actividad' ? getActivityTs(b) :
-        sort.by === 'createdAt' ? new Date(b.createdAt || b.fecha_creacion || 0).getTime() :
-        sort.by === 'estado' ? (b.estado || '') :
-        sort.by === 'prioridad' ? (b.prioridad || '') :
-        (b.numero_ticket || 0);
-
-      if (va < vb) return -1 * dir;
-      if (va > vb) return  1 * dir;
-      return 0;
-    });
+        if (va < vb) return -1 * dir;
+        if (va > vb) return 1 * dir;
+        return 0;
+      });
+    }
 
     return arr;
   }, [tickets, q, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageData = filtered.slice((page-1)*pageSize, page*pageSize);
+  const pageData = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const toggleSort = (by) => {
     setSort(s => s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: 'asc' });
@@ -258,11 +377,8 @@ export default function Tickets() {
      Drawer / acciones (solo comentar)
      ====================== */
   const abrirDrawer = (t) => {
-    // ⬅️ marcado optimista INMEDIATO
     markAsSeenLocal(t);
-    // enviar al backend el "leído", sin romper la UX
     markRead(t._id);
-
     setCurrent(t);
     setForm({ comentario: '', archivo: null });
     setOpen(true);
@@ -271,7 +387,7 @@ export default function Tickets() {
   const cerrarDrawer = () => {
     setOpen(false);
     setCurrent(null);
-    setForm({ comentario:'', archivo:null });
+    setForm({ comentario: '', archivo: null });
   };
 
   const guardarComentario = async () => {
@@ -297,208 +413,367 @@ export default function Tickets() {
   const markRead = async (id) => {
     try {
       await axios.put(`${API}/tickets/${id}/leido`, {}, { headers: headers(token) });
-      // no recargamos aquí para no “reaparecer” chips; el polling/cargar los ajustará si hay nuevas novedades reales
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const isVencida = (ticket) => {
+    if (!ticket.fecha_vencimiento) return false;
+    if (ticket.estado === 'cerrado' || ticket.estado === 'resuelto') return false;
+    return new Date(ticket.fecha_vencimiento) < new Date();
   };
 
   return (
     <div className="tks-wrap">
       <div className="tks-card">
         <div className="tks-head">
-          <h2 style={{margin:0}}>Tickets</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ margin: 0 }}>
+              <Ticket size={20} style={{ display: 'inline', marginRight: 8 }} />
+              Tareas
+            </h2>
+            {/* Selector de vista */}
+            <div className="tks-view-selector">
+              <button
+                className={`tks-view-btn ${viewMode === 'lista' ? 'active' : ''}`}
+                onClick={() => setViewMode('lista')}
+                title="Vista lista"
+              >
+                <LayoutList size={16} />
+              </button>
+              <button
+                className={`tks-view-btn ${viewMode === 'calendario' ? 'active' : ''}`}
+                onClick={() => setViewMode('calendario')}
+                title="Vista calendario"
+              >
+                <CalendarDays size={16} />
+              </button>
+            </div>
+          </div>
 
           <div className="tks-tools">
-            {/* Toggle de tema */}
             <select
               className="tks-select"
               value={theme}
-              onChange={(e)=>setTheme(e.target.value)}
+              onChange={(e) => setTheme(e.target.value)}
               title="Tema"
               aria-label="Tema"
             >
-              <option value="light">Tema claro</option>
-              <option value="dark">Tema oscuro</option>
+              <option value="light"> Tema claro</option>
+              <option value="dark"> Tema oscuro</option>
             </select>
 
-            <input
-              className="tks-search"
-              placeholder="Buscar nº, asunto, descripción o correo"
-              value={q}
-              onChange={(e)=>{ setQ(e.target.value); setPage(1); }}
-            />
-            <select className="tks-select" value={fEstado} onChange={e=>{setFEstado(e.target.value); setPage(1);}}>
+            <div className="search-wrapper">
+              <Search size={16} className="search-icon-input" />
+              <input
+                className="tks-search"
+                placeholder="Buscar nº, asunto, descripción o correo..."
+                value={q}
+                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+              />
+              {q && (
+                <span className="search-results-count">
+                  {filtered.length} resultado(s)
+                </span>
+              )}
+            </div>
+
+            <select className="tks-select" value={fEstado} onChange={e => { setFEstado(e.target.value); setPage(1); }}>
               <option value="">Todos los estados</option>
               {estadoOps.map(op => <option key={op} value={op}>{op}</option>)}
             </select>
-            <select className="tks-select" value={fPrio} onChange={e=>{setFPrio(e.target.value); setPage(1);}}>
+            <select className="tks-select" value={fPrio} onChange={e => { setFPrio(e.target.value); setPage(1); }}>
               <option value="">Todas las prioridades</option>
               {prioOps.map(op => <option key={op} value={op}>{op}</option>)}
             </select>
 
-            {/* Si querés ocultar este botón, simplemente borralo */}
-            <button className="tks-btn ghost" onClick={()=>cargar()}>
-              {loading ? <span className="loader" /> : (
+            <button className="tks-btn ghost" onClick={() => cargar()}>
+              {loading ? <Loader2 size={14} className="spin" /> : (
                 <>
-                  Refrescar
-                  {newsCount > 0 && <span className="tks-badge" style={{marginLeft:8}} title="Novedades">{newsCount}</span>}
+                  <RefreshCw size={14} /> Refrescar
+                  {newsCount > 0 && <span className="tks-badge" style={{ marginLeft: 8 }} title="Novedades">{newsCount}</span>}
                 </>
               )}
             </button>
 
             {newsCount > 0 && (
               <button className="tks-btn" onClick={confirmarVistos} title="Marcar novedades como vistas">
-                Marcar visto
+                <BellRing size={14} /> Marcar visto
               </button>
             )}
           </div>
         </div>
 
-        {/* Leyenda de chips */}
-        <div className="tks-legend">
-          <span className="chip chip-new">Nuevo</span>
-          <span className="chip chip-comment">Comentario</span>
-          <span className="chip chip-state">Estado</span>
-          <span className="chip chip-prio">Prioridad</span>
-        </div>
+        {/* Leyenda de chips (solo en vista lista) */}
+        {viewMode === 'lista' && (
+          <div className="tks-legend">
+            <span className="chip chip-new"> Nuevo</span>
+            <span className="chip chip-comment"> Comentario</span>
+            <span className="chip chip-state"> Estado</span>
+            <span className="chip chip-prio"> Prioridad</span>
+          </div>
+        )}
 
         {loading && (
-          <div className="empty"><span className="loader" /> Cargando…</div>
+          <div className="empty"><Loader2 size={24} className="spin" /> Cargando…</div>
         )}
 
-        {!loading && filtered.length === 0 && (
-          <div className="empty">No hay resultados con los filtros actuales.</div>
+        {/* VISTA CALENDARIO */}
+        {viewMode === 'calendario' && (
+          <div className="tks-calendar-wrapper">
+            <CalendarView tickets={filtered} />
+          </div>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {/* VISTA LISTA */}
+        {viewMode === 'lista' && (
           <>
-            <table className="tks-table">
-              <thead className="tks-thead">
-                <tr>
-                  <th onClick={()=>toggleSort('numero_ticket')} style={{cursor:'pointer'}}>#</th>
-                  <th>Asunto</th>
-                  <th onClick={()=>toggleSort('estado')} style={{cursor:'pointer'}}>Estado</th>
-                  <th onClick={()=>toggleSort('prioridad')} style={{cursor:'pointer'}}>Prioridad</th>
-                  <th>Usuario</th>
-                  {/* El orden inicial es por “actividad” */}
-                  <th onClick={()=>toggleSort('createdAt')} style={{cursor:'pointer'}}>Creado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageData.map(t => {
-                  const ch = changesMap[t._id] || {};
-                  const rowIsNew = ch.nuevo || ch.comentario || ch.estado || ch.prioridad;
-                  return (
-                    <tr
-                      key={t._id}
-                      className={`tks-row ${rowIsNew ? 'row-new' : ''}`}
-                      onClick={() => abrirDrawer(t)}
-                    >
-                      <td style={{width:90}}><strong>#{t.numero_ticket}</strong></td>
-                      <td>
-                        <div style={{fontWeight:700, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
-                          <span>{t.asunto || 'Sin asunto'}</span>
-                          {/* Chips de cambios */}
-                          {ch.nuevo && <span className="chip chip-new">Nuevo</span>}
-                          {ch.comentario && <span className="chip chip-comment">Comentario</span>}
-                          {ch.estado && <span className="chip chip-state">Estado</span>}
-                          {ch.prioridad && <span className="chip chip-prio">Prioridad</span>}
-                        </div>
-                        <div style={{color:'var(--muted)', fontSize:12}}>{(t.descripcion || '').slice(0,90)}</div>
-                      </td>
-                      <td style={{width:140}}><span className={`tks-status ${t.estado}`}>{t.estado}</span></td>
-                      <td style={{width:110}} className={`tks-prio ${t.prioridad}`}>{t.prioridad}</td>
-                      <td style={{width:220}}>{t.usuario_id?.email || '—'}</td>
-                      <td style={{width:160}}>{new Date(t.createdAt || t.fecha_creacion).toLocaleString()}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {!loading && filtered.length === 0 && (
+              <div className="empty">
+                {q ? (
+                  <>🔍 No se encontraron resultados para "<strong>{q}</strong>"</>
+                ) : (
+                  <><Inbox size={32} /> No hay resultados con los filtros actuales.</>
+                )}
+              </div>
+            )}
 
-            <div className="tks-pag">
-              <button className="tks-btn" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Anterior</button>
-              <span className="tks-badge">{page} / {pages}</span>
-              <button className="tks-btn" disabled={page>=pages} onClick={()=>setPage(p=>p+1)}>Siguiente</button>
-            </div>
+            {!loading && filtered.length > 0 && (
+              <>
+                <table className="tks-table">
+                  <thead className="tks-thead">
+                    <tr>
+                      <th onClick={() => toggleSort('numero_ticket')} style={{ cursor: 'pointer' }}>#</th>
+                      <th>Asunto</th>
+                      <th onClick={() => toggleSort('estado')} style={{ cursor: 'pointer' }}>Estado</th>
+                      <th onClick={() => toggleSort('prioridad')} style={{ cursor: 'pointer' }}>Prioridad</th>
+                      <th onClick={() => toggleSort('fecha_vencimiento')} style={{ cursor: 'pointer' }}> Vence</th>
+                      <th>Usuario</th>
+                      <th onClick={() => toggleSort('createdAt')} style={{ cursor: 'pointer' }}>Creado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageData.map(t => {
+                      const ch = changesMap[t._id] || {};
+                      const rowIsNew = ch.nuevo || ch.comentario || ch.estado || ch.prioridad;
+                      const vencida = isVencida(t);
+                      return (
+                        <tr
+                          key={t._id}
+                          className={`tks-row ${rowIsNew ? 'row-new' : ''}`}
+                          onClick={() => abrirDrawer(t)}
+                        >
+                          <td style={{ width: 90 }}><strong>#{t.numero_ticket}</strong></td>
+                          <td style={{ maxWidth: 300 }}>
+                            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span>{t.asunto || 'Sin asunto'}</span>
+                              {ch.nuevo && <span className="chip chip-new"> Nuevo</span>}
+                              {ch.comentario && <span className="chip chip-comment"> Comentario</span>}
+                              {ch.estado && <span className="chip chip-state"> Estado</span>}
+                              {ch.prioridad && <span className="chip chip-prio"> Prioridad</span>}
+                            </div>
+                            <div style={{ color: 'var(--muted)', fontSize: 12 }}>{(t.descripcion || '').slice(0, 90)}</div>
+                          </td>
+                          <td style={{ width: 140 }}><span className={`tks-status ${t.estado}`}>{t.estado}</span></td>
+                          <td style={{ width: 110 }} className={`tks-prio ${t.prioridad}`}>{t.prioridad}</td>
+                          <td style={{ width: 130 }}>
+                            {t.fecha_vencimiento ? (
+                              <div className="fecha-vencimiento-cell">
+                                <Calendar size={12} style={{ display: 'inline', marginRight: 4 }} />
+                                <span className={vencida ? 'fecha-vencida' : ''}>
+                                  {formatearFechaCorta(t.fecha_vencimiento)}
+                                </span>
+                                <Clock size={10} style={{ display: 'inline', marginLeft: 6, marginRight: 2 }} />
+                                <span className={vencida ? 'fecha-vencida' : ''}>
+                                  {formatearHora(t.fecha_vencimiento)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="sin-fecha">—</span>
+                            )}
+                          </td>
+                          <td style={{ width: 200 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <User size={12} />
+                              {t.usuario_id?.email || '—'}
+                            </div>
+                          </td>
+                          <td style={{ width: 160 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Calendar size={12} />
+                              {new Date(t.createdAt || t.fecha_creacion).toLocaleDateString()}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                <div className="tks-pag">
+                  <button className="tks-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+                  <span className="tks-badge">{page} / {pages}</span>
+                  <button className="tks-btn" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>
+                    Siguiente <ChevronRight size={14} />
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
 
-      {/* Drawer detalle: solo comentario/adjunto (sin estado/prioridad) */}
+      {/* Drawer detalle */}
       {open && <div className="backdrop" onClick={cerrarDrawer} />}
       {open && current && (
         <aside className="drawer" role="dialog" aria-modal="true">
           <div className="drawer-head">
             <div>
-              <div style={{fontWeight:800}}>Ticket #{current.numero_ticket}</div>
-              <div style={{color:'var(--muted)', fontSize:12}}>
+              <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Ticket size={18} /> Tarea #{current.numero_ticket}
+              </div>
+              <div style={{ color: 'var(--muted)', fontSize: 12 }}>
                 {current.asunto || 'Sin asunto'} • {current.usuario_id?.email || '—'}
               </div>
             </div>
-            <button className="tks-btn ghost" onClick={cerrarDrawer}>Cerrar ✖</button>
+            <button className="tks-btn ghost" onClick={cerrarDrawer}>
+              <X size={16} /> Cerrar
+            </button>
           </div>
 
           <div className="drawer-body">
             {/* Info básica */}
-            <div className="tks-card" style={{padding:'10px', marginBottom:'10px'}}>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
-                <div><span className="hint">Estado actual</span><div className={`tks-status ${current.estado}`} style={{display:'inline-block', marginTop:6}}>{current.estado}</div></div>
-                <div><span className="hint">Prioridad</span><div className={`tks-prio ${current.prioridad}`} style={{marginTop:6}}>{current.prioridad}</div></div>
-                <div><span className="hint">Creado</span><div style={{marginTop:6}}>{new Date(current.createdAt || current.fecha_creacion).toLocaleString()}</div></div>
-                <div><span className="hint">Usuario</span><div style={{marginTop:6}}>{current.usuario_id?.email || '—'}</div></div>
+            <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <Activity size={12} /> Estado actual
+                  </div>
+                  <div className={`tks-status ${current.estado}`} style={{ display: 'inline-block', padding: '4px 10px' }}>{current.estado}</div>
+                </div>
+                <div>
+                  <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <Flag size={12} /> Prioridad
+                  </div>
+                  <div className={`tks-prio ${current.prioridad}`}>{current.prioridad}</div>
+                </div>
+                <div>
+                  <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <Calendar size={12} /> Creado
+                  </div>
+                  <div>{new Date(current.createdAt || current.fecha_creacion).toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <CalendarClock size={12} /> Vencimiento
+                  </div>
+                  <div>
+                    {current.fecha_vencimiento ? (
+                      <span className={isVencida(current) ? 'fecha-vencida' : ''}>
+                        {formatearFechaHora(current.fecha_vencimiento)}
+                        {isVencida(current) && <span className="badge-vencido"> VENCIDA</span>}
+                      </span>
+                    ) : (
+                      <span className="sin-fecha">No definida</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <User size={12} /> Usuario
+                  </div>
+                  <div>{current.usuario_id?.email || '—'}</div>
+                </div>
+                {/* Info de recurrencia */}
+                {current.es_recurrente && current.recurrencia && (
+                  <div>
+                    <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                      <RefreshCw size={12} /> Recurrencia
+                    </div>
+                    <div style={{
+                      padding: '6px 10px', background: '#eff6ff', border: '1px solid #bfdbfe',
+                      borderRadius: 8, fontSize: 12, color: '#1e40af',
+                      display: 'flex', alignItems: 'center', gap: 6
+                    }}>
+                      <RefreshCw size={12} />
+                      {current.recurrencia.activa
+                        ? <>Cada {current.recurrencia.intervalo} {current.recurrencia.tipo}{current.recurrencia.solo_dias_habiles ? ' (días hábiles)' : ''}</>
+                        : 'Inactiva'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {current.imagen && (
-                <div style={{marginTop:10}}>
-                  <span className="hint">Imagen del ticket</span>
-                  <div style={{marginTop:6}}>
+                <div style={{ marginTop: 12 }}>
+                  <span className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Image size={14} /> Imagen adjunta
+                  </span>
+                  <div style={{ marginTop: 6 }}>
                     <a href={`${API}/uploads/${current.imagen}`} target="_blank" rel="noreferrer">
-                      <img src={`${API}/uploads/${current.imagen}`} alt="Adjunto" width="220" style={{border:'1px solid var(--border)', borderRadius:12}} />
+                      <img src={`${API}/uploads/${current.imagen}`} alt="Adjunto" width="200" style={{ border: '1px solid var(--border)', borderRadius: 12 }} />
                     </a>
                   </div>
                 </div>
               )}
+
+              <SilenciarNotificaciones
+                ticketId={current._id}
+                onEstadoCambiado={() => {
+                  showToast('Preferencias de notificaciones actualizadas');
+                  cargar(true);
+                }}
+              />
             </div>
 
             {/* Comentario + adjunto */}
-            <div className="tks-card" style={{padding:'10px', marginBottom:'10px'}}>
-              <div style={{fontWeight:700, marginBottom:8}}>Agregar comentario</div>
-              <div style={{marginTop:0}}>
+            <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
+              <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <MessageSquare size={14} /> Agregar comentario
+              </div>
+              <div style={{ marginTop: 0 }}>
                 <label className="hint">Comentario</label>
                 <textarea
                   className="textarea"
                   placeholder="Escribí un comentario (podés adjuntar imagen abajo)…"
                   value={form.comentario}
-                  onChange={e=>setForm(f=>({...f, comentario:e.target.value}))}
+                  onChange={e => setForm(f => ({ ...f, comentario: e.target.value }))}
                 />
               </div>
-              <div style={{marginTop:10, display:'grid', gap:8}}>
-                <label className="hint">Adjuntar imagen</label>
+              <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                <label className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Paperclip size={12} /> Adjuntar imagen
+                </label>
                 <input
                   type="file"
                   accept="image/*"
                   className="input"
-                  onChange={(e)=>setForm(f=>({...f, archivo:e.target.files?.[0] || null}))}
+                  onChange={(e) => setForm(f => ({ ...f, archivo: e.target.files?.[0] || null }))}
                 />
                 {form.archivo && <span className="hint">Seleccionado: {form.archivo.name}</span>}
               </div>
             </div>
 
             {/* Timeline */}
-            <div className="tks-card" style={{padding:'10px'}}>
-              <div style={{fontWeight:800, marginBottom:8}}>Actividad</div>
+            <div className="tks-card" style={{ padding: '12px' }}>
+              <div style={{ fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock size={14} /> Actividad
+              </div>
               {current.historial?.length ? (
                 <ul className="timeline">
                   {current.historial.slice().reverse().map((h, idx) => (
                     <li key={idx}>
-                      <time>{new Date(h.fecha).toLocaleString()} • {h.autor || 'sistema'}</time>
+                      <time style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Calendar size={10} /> {new Date(h.fecha).toLocaleString()} • <User size={10} /> {h.autor || 'sistema'}
+                      </time>
                       <div><strong>{h.estado}</strong>: {h.comentario}</div>
                       {h.imagen && (
-                        <div style={{marginTop:6}}>
+                        <div style={{ marginTop: 6 }}>
                           <a href={`${API}/uploads/${h.imagen}`} target="_blank" rel="noreferrer">
-                            <img src={`${API}/uploads/${h.imagen}`} alt="Adjunto" width="180" style={{border:'1px solid var(--border)', borderRadius:10}} />
+                            <img src={`${API}/uploads/${h.imagen}`} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
                           </a>
                         </div>
                       )}
@@ -512,9 +787,12 @@ export default function Tickets() {
           </div>
 
           <div className="drawer-foot">
-            <button className="tks-btn ghost" onClick={cerrarDrawer}>Cancelar</button>
+            <button className="tks-btn ghost" onClick={cerrarDrawer}>
+              <X size={14} /> Cancelar
+            </button>
             <button className="tks-btn" onClick={guardarComentario} disabled={saving}>
-              {saving ? <span className="loader" /> : 'Guardar comentario'}
+              {saving ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+              {saving ? 'Guardando...' : 'Guardar comentario'}
             </button>
           </div>
         </aside>
@@ -524,9 +802,11 @@ export default function Tickets() {
       <div className="toast-wrap">
         {toasts.map(t => (
           <div key={t.id} className="toast info">
-            <div className="toast-icon">🔔</div>
+            <Bell size={16} className="toast-icon" />
             <div className="toast-msg">{t.msg}</div>
-            <button className="toast-close" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>✖</button>
+            <button className="toast-close" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>
+              <X size={14} />
+            </button>
           </div>
         ))}
       </div>

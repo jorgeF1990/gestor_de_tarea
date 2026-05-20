@@ -291,3 +291,226 @@ input:focus, textarea:focus, select:focus {
 .bell-panel__head {
   border-bottom: 1px solid var(--border-color);
 }
+/* ====== CAMPO FECHA ====== */
+input[type="date"] {
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.4);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+  }
+}
+/* Fila de dos columnas para fecha y hora */
+.form-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.form-group.half {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* Estilos para inputs de fecha y hora (mantiene consistencia) */
+input[type="date"],
+input[type="time"] {
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 10px;
+  border: 1px solid #e1e2e6;
+  background: #fbfbfc;
+  color: #181a20;
+  outline: none;
+  transition: border-color 120ms ease;
+  cursor: pointer;
+}
+
+input[type="date"]:focus,
+input[type="time"]:focus {
+  border-color: #9aa0b4;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.4);
+  cursor: pointer;
+}
+
+/* Responsive para móviles */
+@media (max-width: 560px) {
+  .form-row {
+    flex-direction: column;
+    gap: 14px;
+  }
+  
+  .form-group.half {
+    width: 100%;
+  }
+}
+
+/* ====== ICONOS Y MEJORAS PROFESIONALES ====== */
+
+/* Fila de dos columnas para fecha y hora */
+.form-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.form-group.half {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* Wrapper para inputs de fecha y hora con icono */
+.date-time-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.date-time-wrapper .input-icon {
+  position: absolute;
+  left: 12px;
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.date-time-wrapper input {
+  width: 100%;
+  padding: 12px 12px 12px 38px;
+  border-radius: 10px;
+  border: 1px solid #e1e2e6;
+  background: #fbfbfc;
+  color: #181a20;
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.date-time-wrapper input:focus {
+  border-color: var(--link, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.date-time-wrapper input:hover {
+  border-color: #9aa0b4;
+}
+
+/* Icono en labels */
+.label-icon {
+  margin-right: 4px;
+}
+
+/* Loader pequeño para botón */
+.loader-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dropzone mejorada con icono */
+.dropzone-icon {
+  margin-bottom: 8px;
+  color: #9ca3af;
+}
+
+.dropzone-empty small.hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* Welcome icon */
+.welcome-icon {
+  margin-bottom: 16px;
+  color: var(--brand, #4f46e5);
+}
+
+/* Mejora en botones con iconos */
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Estilos para inputs de fecha y hora */
+input[type="date"],
+input[type="time"] {
+  width: 100%;
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.4);
+  cursor: pointer;
+  background: transparent;
+  position: relative;
+  right: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .date-time-wrapper input {
+    background: #1e293b;
+    border-color: #475569;
+    color: #f1f5f9;
+  }
+  
+  .date-time-wrapper .input-icon {
+    color: #64748b;
+  }
+  
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+  }
+}
+
+/* Responsive */
+@media (max-width: 560px) {
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .form-group.half {
+    width: 100%;
+  }
+  
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .home-auth-buttons {
+    flex-direction: column;
+  }
+  
+  .home-auth-buttons .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -49,7 +49,7 @@ export default function Sidebar({ open, onToggle }) {
 
           <NavLink to="/tickets" className="sidebar-link" onClick={maybeClose}>
             <span className="icon"></span>
-            <span className="label">Tickets</span>
+            <span className="label">Tareas</span>
           </NavLink>
 
           {user?.rol === "admin" && (

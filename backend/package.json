@@ -8,16 +8,24 @@
     "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["tickets", "backend", "nodejs", "express", "api"],
+  "keywords": [
+    "tickets",
+    "backend",
+    "nodejs",
+    "express",
+    "api"
+  ],
   "author": "Tu Nombre",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.12.2",
+    "axios": "^1.15.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "express-session": "^1.19.0",
+    "googleapis": "^171.4.0",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "mongoose": "^8.19.1",

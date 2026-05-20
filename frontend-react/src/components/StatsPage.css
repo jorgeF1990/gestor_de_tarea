@@ -190,3 +190,35 @@
     page-break-inside: avoid;
   }
 }
+/* ====== KPIs de vencimiento ====== */
+.kpi-vencido .kpi-value {
+  color: #ef4444;
+}
+
+.kpi-hoy .kpi-value {
+  color: #f59e0b;
+}
+
+.kpi-semana .kpi-value {
+  color: #3b82f6;
+}
+
+/* Estilos para la gráfica de vencimiento */
+.chart-card .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Responsive para KPIs */
+@media (max-width: 1100px) {
+  .kpi-row {
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

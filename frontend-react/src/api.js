@@ -1,13 +1,21 @@
 // src/api.js
 import axios from 'axios';
 
+// Usar la variable de entorno, sin fallback a localhost
+const API_URL = import.meta.env.VITE_BACKEND_URL || '';
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001',
-  timeout: 10000
+  baseURL: API_URL,
+  timeout: 10000,
+  withCredentials: true
 });
 
+// Para desarrollo local, si no hay variable, usa localhost
+if (import.meta.env.DEV && !API_URL) {
+  API.defaults.baseURL = 'http://localhost:5001';
+}
+
 const handle = (p) => p.then(res => res.data).catch(err => {
-  // Normalizar el error para que los componentes lo manejen consistentemente
   if (err?.response?.data) throw err.response.data;
   if (err?.message) throw { message: err.message };
   throw err;
@@ -28,5 +36,4 @@ export const recuperarPassword = (email) =>
 export const resetPassword = (token, nuevaPassword) =>
   handle(API.post(`/auth/reset/${token}`, { nuevaPassword }));
 
-// Export default por si prefieres usar la instancia directamente
 export default API;

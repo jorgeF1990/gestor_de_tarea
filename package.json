@@ -2,9 +2,12 @@
   "name": "sistema-tickets",
   "version": "1.0.0",
   "description": "Sistema de tickets con backend en Node.js y frontend en React",
-  "main": "index.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-react\"",
+    "build:frontend": "npm run build --prefix frontend-react",
+    "build": "npm run build:frontend",
+    "start": "node api/index.js",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-react\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

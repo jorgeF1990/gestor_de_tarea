@@ -1,39 +1,33 @@
 {
   "name": "sistema-tickets",
   "version": "1.0.0",
-  "description": "Backend del sistema de tickets con Node.js y Express",
-  "main": "app.js",
+  "description": "Sistema de tickets con backend en Node.js y frontend en React",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "build:frontend": "npm run build --prefix frontend-react",
+    "build": "npm run build:frontend",
+    "start": "node api/index.js",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-react\"",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jorgeF1990/sistema-tickets.git"
   },
   "keywords": [
     "tickets",
-    "backend",
     "nodejs",
-    "express",
-    "api"
+    "react",
+    "vite",
+    "express"
   ],
-  "author": "Tu Nombre",
+  "author": "Jorge F.",
   "license": "ISC",
-  "dependencies": {
-    "axios": "^1.15.2",
-    "bcrypt": "^6.0.0",
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "express-session": "^1.19.0",
-    "googleapis": "^171.4.0",
-    "jsonwebtoken": "^9.0.2",
-    "jwt-decode": "^4.0.0",
-    "mongoose": "^8.19.1",
-    "multer": "^2.0.2",
-    "nodemailer": "^7.0.9"
+  "bugs": {
+    "url": "https://github.com/jorgeF1990/sistema-tickets/issues"
   },
-  "devDependencies": {
-    "concurrently": "^9.2.1",
-    "nodemon": "^3.1.10"
+  "homepage": "https://github.com/jorgeF1990/sistema-tickets#readme",
+  "dependencies": {
+    "concurrently": "^9.2.1"
   }
 }

@@ -33,13 +33,13 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* =========================   Estáticos (logo y uploads)   ========================= */
+/* =========================   Estaticos (logo y uploads)   ========================= */
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/admin', adminRoutes);
 
-/* =========================   MongoDB - CONEXIÓN ROBUSTA   ========================= */
+/* =========================   MongoDB - CONEXION ROBUSTA   ========================= */
 const mongooseOptions = {
   serverSelectionTimeoutMS: 5000,
   connectTimeoutMS: 10000,
@@ -53,48 +53,60 @@ const mongooseOptions = {
   family: 4
 };
 
-mongoose.connect(process.env.MONGO_URI, mongooseOptions)
+// Determinar que URI usar (prioridad: MONGODB_URI > MONGO_URI)
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+if (!MONGODB_URI) {
+  console.error('ERROR: No se encontro MONGODB_URI ni MONGO_URI en las variables de entorno');
+  console.error('Asegurate de tener configurado el archivo .env');
+  process.exit(1);
+}
+
+console.log('Conectando a MongoDB...');
+console.log('Modo:', MONGODB_URI.includes('mongodb+srv') ? 'Atlas (produccion)' : 'Local');
+
+mongoose.connect(MONGODB_URI, mongooseOptions)
   .then(() => {
     console.log('MongoDB conectado correctamente');
     console.log('Base de datos:', mongoose.connection.name);
     startScheduler();
   })
   .catch(err => {
-    console.error('Error de conexión a MongoDB:', err.message);
+    console.error('Error de conexion a MongoDB:', err.message);
     process.exit(1);
   });
 
-  // Mantener viva la conexión a MongoDB (ping cada 1 minuto)
+// Mantener viva la conexion a MongoDB (ping cada 1 minuto)
 setInterval(async () => {
   try {
     if (mongoose.connection.readyState === 1) {
       await mongoose.connection.db.admin().ping();
     }
   } catch (err) {
-    console.warn('⚠️ Ping a MongoDB falló:', err.message);
+    console.warn('Ping a MongoDB fallo:', err.message);
   }
 }, 60000);
 
-// Manejar eventos de conexión
+// Manejar eventos de conexion
 mongoose.connection.on('connected', () => {
-  console.log('✅ Mongoose conectado a MongoDB');
+  console.log('Mongoose conectado a MongoDB');
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('❌ Error de conexión Mongoose:', err.message);
+  console.error('Error de conexion Mongoose:', err.message);
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ Mongoose desconectado de MongoDB');
+  console.warn('Mongoose desconectado de MongoDB');
 });
 
 mongoose.connection.on('reconnected', () => {
-  console.log('🔄 Mongoose reconectado a MongoDB');
+  console.log('Mongoose reconectado a MongoDB');
 });
 
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
-  console.log('MongoDB desconectado por cierre de la aplicación');
+  console.log('MongoDB desconectado por cierre de la aplicacion');
   process.exit(0);
 });
 
@@ -138,7 +150,7 @@ app.get('/auth/reset/:token', async (req, res) => {
       resetToken: token,
       resetTokenExpira: { $gt: Date.now() }
     });
-    if (!usuario) return res.status(400).send('Token inválido o expirado');
+    if (!usuario) return res.status(400).send('Token invalido o expirado');
 
     return res.send(`
       <!doctype html>
@@ -146,7 +158,7 @@ app.get('/auth/reset/:token', async (req, res) => {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width,initial-scale=1">
-          <title>Restablecer contraseña</title>
+          <title>Restablecer contrasena</title>
           <style>
             body { font-family: Arial, sans-serif; max-width:600px; margin:40px auto; padding:20px; }
             label, input, button { display:block; width:100%; }
@@ -155,14 +167,14 @@ app.get('/auth/reset/:token', async (req, res) => {
           </style>
         </head>
         <body>
-          <h2>Restablecer contraseña</h2>
+          <h2>Restablecer contrasena</h2>
           <p>Usuario: ${usuario.email}</p>
           <form method="POST" action="/auth/reset/${token}">
             <label>
-              Nueva contraseña
-              <input name="nuevaPassword" type="password" placeholder="Nueva contraseña" required minlength="8" />
+              Nueva contrasena
+              <input name="nuevaPassword" type="password" placeholder="Nueva contrasena" required minlength="8" />
             </label>
-            <button type="submit">Restablecer contraseña</button>
+            <button type="submit">Restablecer contrasena</button>
           </form>
         </body>
       </html>
@@ -176,22 +188,22 @@ app.get('/auth/reset/:token', async (req, res) => {
 /* =========================   Inicio servidor   ========================= */
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`\n${'='.repeat(50)}`);
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-  console.log(`📋 Rutas disponibles:`);
-  console.log(`  POST   /tickets        - Crear tarea`);
-  console.log(`  GET    /tickets        - Listar tareas`);
-  console.log(`  PUT    /tickets/:id/estado - Actualizar estado`);
-  console.log(`  GET    /tickets/:id/calendar - Descargar ICS`);
-  console.log(`  GET    /ping-db        - Verificar conexión MongoDB`);
-  console.log(`  GET    /health         - Health check`);
-  console.log(`\n📧 Sistema de notificaciones:`);
-  console.log(`  - 30, 21, 14, 7, 3, 1 días antes del vencimiento`);
-  console.log(`  - El mismo día del vencimiento`);
-  console.log(`  - Recordatorios post-vencimiento (1, 3, 7, 14, 30 días)`);
-  console.log(`  - Notificaciones de asignación/desasignación`);
-  console.log(`  - Notificaciones de comentarios`);
-  console.log(`${'='.repeat(50)}\n`);
+  console.log('\n' + '='.repeat(50));
+  console.log('Servidor corriendo en puerto ' + PORT);
+  console.log('Rutas disponibles:');
+  console.log('  POST   /tickets        - Crear tarea');
+  console.log('  GET    /tickets        - Listar tareas');
+  console.log('  PUT    /tickets/:id/estado - Actualizar estado');
+  console.log('  GET    /tickets/:id/calendar - Descargar ICS');
+  console.log('  GET    /ping-db        - Verificar conexion MongoDB');
+  console.log('  GET    /health         - Health check');
+  console.log('\nSistema de notificaciones:');
+  console.log('  - 30, 21, 14, 7, 3, 1 dias antes del vencimiento');
+  console.log('  - El mismo dia del vencimiento');
+  console.log('  - Recordatorios post-vencimiento (1, 3, 7, 14, 30 dias)');
+  console.log('  - Notificaciones de asignacion/desasignacion');
+  console.log('  - Notificaciones de comentarios');
+  console.log('='.repeat(50) + '\n');
 });
 
 module.exports = app;

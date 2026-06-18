@@ -1,16 +1,19 @@
 // src/api.js
 import axios from 'axios';
 
-// Usar la variable de entorno, sin fallback a localhost
+// Obtener la URL de la variable de entorno
 const API_URL = import.meta.env.VITE_BACKEND_URL || '';
 
+// Si no hay URL, usar una ruta relativa (no localhost)
+const BASE_URL = API_URL || '';
+
 const API = axios.create({
-  baseURL: API_URL,
+  baseURL: BASE_URL,
   timeout: 10000,
   withCredentials: true
 });
 
-// Para desarrollo local, si no hay variable, usa localhost
+// Solo para desarrollo local
 if (import.meta.env.DEV && !API_URL) {
   API.defaults.baseURL = 'http://localhost:5001';
 }

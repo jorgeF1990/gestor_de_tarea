@@ -69,3 +69,4 @@ coverage/
 # VARIOS
 # =========================
 *.local
+.vercel

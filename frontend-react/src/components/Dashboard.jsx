@@ -21,7 +21,7 @@ const SEEN_KEY_ADMIN = 'dashboard_last_seen:v1';
 const OPEN_KEY_ADMIN = 'dashboard_open_cards:v1';
 const THEME_KEY = 'dashboard-theme';
 const VIEW_MODE_KEY = 'dashboard_view_mode:v1';
-const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
+const API = import.meta.env.VITE_BACKEND_URL || '';
 
 // Helpers ============================================================
 const getActivityTs = (t) => {

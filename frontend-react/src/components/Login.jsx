@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import './Auth.css';
 
-const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
+const API = import.meta.env.VITE_BACKEND_URL || '';
 
 function Login() {
   const navigate = useNavigate();

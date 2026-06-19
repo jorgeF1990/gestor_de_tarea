@@ -311,5 +311,32 @@ if (!process.env.VERCEL) {
     console.warn('Conexion inicial a MongoDB fallo:', err.message);
   });
 }
+// backend/app.js - Al inicio, después de require('dotenv')
+console.log('=== INICIO DEL BACKEND ===');
+console.log('VERCEL:', process.env.VERCEL);
+console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'DEFINIDA' : 'NO DEFINIDA');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('===========================');
+
+// ... luego, en la conexión a MongoDB:
+console.log('Conectando a MongoDB...');
+console.log('URI:', MONGODB_URI ? MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') : 'NO DEFINIDA');
+
+mongoose.connect(MONGODB_URI, mongooseOptions)
+  .then(() => {
+    console.log('MongoDB conectado correctamente');
+    console.log('Base de datos:', mongoose.connection.name);
+    if (!process.env.VERCEL) {
+      startScheduler();
+    }
+  })
+  .catch(err => {
+    console.error('ERROR DE CONEXION A MONGODB:', err.message);
+    console.error('STACK:', err.stack);
+    // En Vercel, no hacer process.exit
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
+  });
 
 module.exports = app;

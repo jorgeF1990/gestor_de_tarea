@@ -12,7 +12,11 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/health",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/ping-db",
       "dest": "api/index.js"
     },
     {
@@ -24,11 +28,7 @@
       "dest": "api/index.js"
     },
     {
-      "src": "/ping-db",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/health",
+      "src": "/api/(.*)",
       "dest": "api/index.js"
     },
     {

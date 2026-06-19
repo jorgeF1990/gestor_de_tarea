@@ -1,4 +1,12 @@
-require('dotenv').config();
+// ============================================================
+// CARGA DE VARIABLES DE ENTORNO (compatible con Vercel y local)
+// ============================================================
+try {
+  require('dotenv').config();
+  console.log('dotenv cargado correctamente');
+} catch (err) {
+  console.log('dotenv no disponible, usando variables del sistema');
+}
 
 // Dependencias
 const express = require('express');
@@ -30,13 +38,12 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Permitir peticiones sin origen (como mobile apps o curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.warn('Origen no permitido:', origin);
-      callback(null, true); // En desarrollo, permitir todos
+      callback(null, true);
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -68,14 +75,11 @@ const mongooseOptions = {
   family: 4
 };
 
-// Determinar que URI usar (prioridad: MONGODB_URI > MONGO_URI)
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
-// Variable para controlar el estado de la conexión
 let isMongoConnected = false;
 let mongoConnectionPromise = null;
 
-// Función para conectar a MongoDB (con reintentos)
 const connectToMongoDB = async () => {
   if (mongoConnectionPromise) {
     return mongoConnectionPromise;
@@ -83,14 +87,15 @@ const connectToMongoDB = async () => {
 
   if (!MONGODB_URI) {
     console.error('ERROR: No se encontro MONGODB_URI ni MONGO_URI en las variables de entorno');
-    console.error('Asegurate de tener configurado el archivo .env');
-    // En Vercel, no hacemos process.exit, solo retornamos error
+    console.error('Asegurate de tener configurado el archivo .env o las variables en Vercel');
     return Promise.reject(new Error('MONGODB_URI no definida'));
   }
 
   console.log('Conectando a MongoDB...');
   console.log('Modo:', MONGODB_URI.includes('mongodb+srv') ? 'Atlas (produccion)' : 'Local');
-  console.log('URI:', MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')); // Ocultar credenciales
+  
+  const maskedURI = MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
+  console.log('URI:', maskedURI);
 
   mongoConnectionPromise = mongoose.connect(MONGODB_URI, mongooseOptions)
     .then(() => {
@@ -98,7 +103,6 @@ const connectToMongoDB = async () => {
       console.log('MongoDB conectado correctamente');
       console.log('Base de datos:', mongoose.connection.name);
       
-      // Iniciar scheduler SOLO si estamos en entorno local o si es necesario
       if (!process.env.VERCEL) {
         startScheduler();
       } else {
@@ -117,14 +121,12 @@ const connectToMongoDB = async () => {
   return mongoConnectionPromise;
 };
 
-// Función para obtener el estado de la conexión
 const getMongoStatus = () => ({
   readyState: mongoose.connection.readyState,
   isConnected: isMongoConnected && mongoose.connection.readyState === 1,
   readyStateText: ['desconectado', 'conectado', 'conectando', 'desconectando'][mongoose.connection.readyState] || 'desconocido'
 });
 
-// Middleware para asegurar conexión a MongoDB antes de cada request
 const ensureMongoConnection = async (req, res, next) => {
   try {
     if (!isMongoConnected || mongoose.connection.readyState !== 1) {
@@ -187,12 +189,10 @@ app.get('/health', async (_req, res) => {
   try {
     const status = getMongoStatus();
     
-    // Intentar conectar si no está conectado
     if (!status.isConnected) {
       try {
         await connectToMongoDB();
       } catch (err) {
-        // Si falla, reportamos el error pero no fallamos el health check
         console.warn('Health check: MongoDB no disponible');
       }
     }
@@ -217,7 +217,6 @@ app.get('/auth/reset/:token', async (req, res) => {
   try {
     const { token } = req.params;
     
-    // Asegurar conexión para esta consulta
     if (!isMongoConnected || mongoose.connection.readyState !== 1) {
       try {
         await connectToMongoDB();
@@ -280,10 +279,7 @@ app.use((err, req, res, next) => {
 /* =========================   Inicio servidor   ========================= */
 const PORT = process.env.PORT || 5001;
 
-// Conectar a MongoDB al iniciar (solo en entorno local)
-// En Vercel, la conexión se hará bajo demanda con el middleware ensureMongoConnection
 if (!process.env.VERCEL) {
-  // Conectar y luego iniciar el servidor
   connectToMongoDB()
     .then(() => {
       app.listen(PORT, () => {
@@ -310,13 +306,10 @@ if (!process.env.VERCEL) {
       process.exit(1);
     });
 } else {
-  // En Vercel, conectar en el primer request
-  console.log('Modo Vercel: Conexión bajo demanda activada');
-  // Intentar conexión inicial pero no bloquear
+  console.log('Modo Vercel: Conexion bajo demanda activada');
   connectToMongoDB().catch(err => {
-    console.warn('Conexión inicial a MongoDB falló:', err.message);
+    console.warn('Conexion inicial a MongoDB fallo:', err.message);
   });
 }
 
-// Exportar la app para Vercel
 module.exports = app;

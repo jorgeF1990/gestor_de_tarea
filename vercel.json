@@ -32,6 +32,14 @@
       "dest": "api/index.js"
     },
     {
+      "src": "/admin/(.*)",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/calendar/(.*)",
+      "dest": "api/index.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "frontend-react/dist/$1"
     }

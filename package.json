@@ -4,44 +4,32 @@
   "description": "Sistema de tickets con backend en Node.js y frontend en React",
   "main": "api/index.js",
   "scripts": {
-    "build:frontend": "npm run build --prefix frontend-react",
+    "build:frontend": "cd frontend-react && npm run build",
     "build": "npm run build:frontend",
     "start": "node api/index.js",
-    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-react\"",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend-react && npm run dev\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jorgeF1990/sistema-tickets.git"
-  },
-  "keywords": [
-    "tickets",
-    "nodejs",
-    "react",
-    "vite",
-    "express"
-  ],
-  "author": "Jorge F.",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/jorgeF1990/sistema-tickets/issues"
-  },
-  "homepage": "https://github.com/jorgeF1990/sistema-tickets#readme",
   "dependencies": {
+    "axios": "^1.15.2",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
     "concurrently": "^9.2.1",
+    "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
-    "mongoose": "^8.19.1",
-    "cors": "^2.8.5",
-    "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^7.0.9",
-    "multer": "^2.0.2",
     "express-session": "^1.19.0",
     "googleapis": "^171.4.0",
-    "axios": "^1.15.2",
+    "ical-generator": "^10.2.0",
+    "imapflow": "^1.0.0",
+    "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
-    "bcrypt": "^6.0.0",
-    "node-cron": "^3.0.3"
+    "mailparser": "^3.7.1",
+    "mongoose": "^8.19.1",
+    "multer": "^2.0.2",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^7.0.9",
+    "sanitize-filename": "^1.6.3",
+    "uuid": "^11.1.0"
   }
 }

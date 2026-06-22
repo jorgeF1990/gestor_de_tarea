@@ -33,6 +33,7 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim();
 const allowedOrigins = [
   FRONTEND_URL,
   'https://gestor-de-tarea-jorgesfb29-gmailcoms-projects.vercel.app',
+  'https://gestor-de-tarea-sepia.vercel.app',
   'http://localhost:3000',
   'http://localhost:5001'
 ].filter(Boolean);

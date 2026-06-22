@@ -12,11 +12,11 @@
   ],
   "rewrites": [
     {
-      "source": "/health",
+      "source": "/tickets",
       "destination": "/api/index.js"
     },
     {
-      "source": "/ping-db",
+      "source": "/tickets/(.*)",
       "destination": "/api/index.js"
     },
     {
@@ -24,7 +24,11 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/tickets/(.*)",
+      "source": "/health",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/ping-db",
       "destination": "/api/index.js"
     },
     {

@@ -1,3 +1,4 @@
+// backend/app.js
 // ============================================================
 // CARGA DE VARIABLES DE ENTORNO (compatible con Vercel y local)
 // ============================================================
@@ -133,10 +134,15 @@ const getMongoStatus = () => ({
 });
 
 const ensureMongoConnection = async (req, res, next) => {
+  console.log('ensureMongoConnection llamado para:', req.method, req.path);
+  console.log('isMongoConnected:', isMongoConnected, 'readyState:', mongoose.connection.readyState);
+  
   try {
     if (!isMongoConnected || mongoose.connection.readyState !== 1) {
+      console.log('MongoDB no conectado, intentando conectar...');
       await connectToMongoDB();
     }
+    console.log('Conexion MongoDB OK, continuando...');
     next();
   } catch (err) {
     console.error('Error asegurando conexion MongoDB:', err.message);
@@ -148,9 +154,18 @@ const ensureMongoConnection = async (req, res, next) => {
   }
 };
 
+/* =========================   REGISTRO DE RUTAS   ========================= */
+console.log('=== REGISTRO DE RUTAS ===');
+console.log('Auth routes registradas en /auth');
+console.log('Ticket routes registradas en /tickets');
+console.log('===========================');
+
 /* =========================   Rutas principales   ========================= */
 app.use('/auth', ensureMongoConnection, authRoutes);
+console.log('Ruta /auth registrada');
+
 app.use('/tickets', ensureMongoConnection, ticketRoutes);
+console.log('Ruta /tickets registrada');
 
 /* =========================   Utilidades   ========================= */
 app.get('/', (_req, res) => res.send('Backend funcionando correctamente'));

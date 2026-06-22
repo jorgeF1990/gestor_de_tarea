@@ -1,3 +1,4 @@
+// backend/controllers/tickets.controller.js
 const mongoose = require('mongoose');
 const Ticket = require('../models/ticket.model');
 const User = require('../models/User');
@@ -108,6 +109,9 @@ async function getDestinatariosNotificacion(ticket, actorEmail, accion) {
 /* ==================== CREAR TICKET ==================== */
 exports.crearTicket = async (req, res) => {
   try {
+    console.log('crearTicket llamado - body:', req.body);
+    console.log('crearTicket llamado - user:', req.user);
+    
     const asunto = (req.body?.asunto || '').toString().trim();
     const descripcion = (req.body?.descripcion || '').toString();
     const imagen = req.file?.filename || null;
@@ -131,7 +135,7 @@ exports.crearTicket = async (req, res) => {
       const soloDiasHabiles = req.body?.solo_dias_habiles !== 'false' && req.body?.solo_dias_habiles !== false;
       
       if (!tipo || !['diaria', 'semanal', 'mensual', 'anual'].includes(tipo)) {
-        return res.status(400).json({ error: 'Tipo de recurrencia inválido. Use: diaria, semanal, mensual o anual' });
+        return res.status(400).json({ error: 'Tipo de recurrencia invalido. Use: diaria, semanal, mensual o anual' });
       }
       
       if (soloDiasHabiles && fecha_vencimiento) {
@@ -182,19 +186,19 @@ exports.crearTicket = async (req, res) => {
     }
 
     if (fecha_vencimiento && isNaN(fecha_vencimiento.getTime())) {
-      return res.status(400).json({ error: 'Fecha de vencimiento inválida' });
+      return res.status(400).json({ error: 'Fecha de vencimiento invalida' });
     }
 
     let descripcionRecurrencia = '';
     if (esRecurrente && configRecurrencia) {
       const { tipo, intervalo, solo_dias_habiles } = configRecurrencia;
-      const tipoTexto = { diaria: 'día(s)', semanal: 'semana(s)', mensual: 'mes(es)', anual: 'año(s)' };
-      descripcionRecurrencia = `\nRecurrencia: Cada ${intervalo} ${tipoTexto[tipo]}`;
-      if (solo_dias_habiles) descripcionRecurrencia += ' (solo días hábiles)';
+      const tipoTexto = { diaria: 'dia(s)', semanal: 'semana(s)', mensual: 'mes(es)', anual: 'anio(s)' };
+      descripcionRecurrencia = '\nRecurrencia: Cada ' + intervalo + ' ' + tipoTexto[tipo];
+      if (solo_dias_habiles) descripcionRecurrencia += ' (solo dias habiles)';
       if (tipo === 'semanal' && configRecurrencia.dias_semana) {
-        const nombresDias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const nombresDias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
         const dias = configRecurrencia.dias_semana.map(d => nombresDias[d]).join(', ');
-        descripcionRecurrencia += ` - Días: ${dias}`;
+        descripcionRecurrencia += ' - Dias: ' + dias;
       }
     }
 
@@ -220,7 +224,7 @@ exports.crearTicket = async (req, res) => {
       historial: [{
         fecha: new Date(),
         estado: 'pendiente',
-        comentario: `Tarea creada.${descripcionRecurrencia}\nAsunto: ${asunto}\nDescripción: ${descripcion}${fecha_vencimiento ? `\nFecha vencimiento: ${fecha_vencimiento.toLocaleString()}` : ''}`,
+        comentario: 'Tarea creada.' + descripcionRecurrencia + '\nAsunto: ' + asunto + '\nDescripcion: ' + descripcion + (fecha_vencimiento ? '\nFecha vencimiento: ' + fecha_vencimiento.toLocaleString() : ''),
         autor: req.user.email
       }],
       leidoPor: [{ usuario: req.user.email, fecha: new Date() }]
@@ -234,11 +238,11 @@ exports.crearTicket = async (req, res) => {
     ticket.ultimo_autor = req.user.email;
 
     const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'crear');
-    const imagenPath = imagen ? `uploads/${imagen}` : null;
+    const imagenPath = imagen ? 'uploads/' + imagen : null;
     
     if (destinatarios.length) {
       await enviarCorreoTicket(ticket, destinatarios, imagenPath, 'crear');
-      console.log(`[CREAR] Notificación enviada a ${destinatarios.length}: ${destinatarios.join(', ')}`);
+      console.log('[CREAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
 
     res.status(201).json(ticket);
@@ -253,7 +257,7 @@ exports.agregarComentario = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ mensaje: 'ID inválido' });
+      return res.status(400).json({ mensaje: 'ID invalido' });
     }
 
     const comentario = (req.body?.comentario || '').toString();
@@ -294,11 +298,11 @@ exports.agregarComentario = async (req, res) => {
     updated.ultimo_autor = req.user.email;
 
     const destinatarios = await getDestinatariosNotificacion(updated, req.user.email, 'comentario');
-    const imagenPath = imagen ? `uploads/${imagen}` : null;
+    const imagenPath = imagen ? 'uploads/' + imagen : null;
     
     if (destinatarios.length) {
       await enviarCorreoTicket(updated, destinatarios, imagenPath, 'comentario');
-      console.log(`[COMENTARIO] Notificación enviada a ${destinatarios.length}: ${destinatarios.join(', ')}`);
+      console.log('[COMENTARIO] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
 
     res.json(updated);
@@ -328,7 +332,7 @@ exports.actualizarEstado = async (req, res) => {
       return res.status(401).json({ mensaje: 'Usuario no autenticado' });
     }
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ mensaje: 'ID inválido' });
+      return res.status(400).json({ mensaje: 'ID invalido' });
     }
 
     const actual = await Ticket.findById(id)
@@ -344,16 +348,16 @@ exports.actualizarEstado = async (req, res) => {
     // 1. Cambio de estado
     if (estado && estado !== actual.estado) {
       setOps.estado = estado;
-      cambios.push(`Estado: ${actual.estado} → ${estado}`);
+      cambios.push('Estado: ' + actual.estado + ' -> ' + estado);
       if (estado === 'resuelto' || estado === 'cerrado') {
         setOps.fecha_cierre = new Date();
       }
     }
     
-    // 2. Cambio de prioridad (normalizar a minúsculas)
+    // 2. Cambio de prioridad (normalizar a minusculas)
     if (prioridad && prioridad.toLowerCase() !== actual.prioridad) {
       setOps.prioridad = prioridad.toLowerCase();
-      cambios.push(`Prioridad: ${actual.prioridad} → ${prioridad.toLowerCase()}`);
+      cambios.push('Prioridad: ' + actual.prioridad + ' -> ' + prioridad.toLowerCase());
     }
 
     // 3. Cambio de fecha de vencimiento
@@ -363,25 +367,23 @@ exports.actualizarEstado = async (req, res) => {
         const oldDateStr = actual.fecha_vencimiento ? new Date(actual.fecha_vencimiento).toISOString().substring(0, 10) : 'No definida';
         const newDateStr = newDate.toISOString().substring(0, 10);
         setOps.fecha_vencimiento = newDate;
-        cambios.push(`Fecha Vencimiento: ${oldDateStr} → ${newDateStr}`);
+        cambios.push('Fecha Vencimiento: ' + oldDateStr + ' -> ' + newDateStr);
         if (actual.recurrencia && actual.recurrencia.activa) {
           setOps['recurrencia.fecha_inicio'] = newDate;
         }
       }
     }
 
-        // 4. Cambio de recurrencia (SOLUCIÓN ROBUSTA)
+    // 4. Cambio de recurrencia
     if (es_recurrente !== undefined && es_recurrente !== null) {
       const esRecurrenteBool = es_recurrente === true || es_recurrente === 'true';
       
-      // Verificar si el ticket tiene una configuración de recurrencia VÁLIDA
       const tieneRecurrenciaValida = actual.recurrencia && 
                                      typeof actual.recurrencia === 'object' && 
                                      actual.recurrencia.tipo;
       
       if (esRecurrenteBool) {
         if (!tieneRecurrenciaValida) {
-          // ===== INICIALIZAR RECURRENCIA DESDE CERO =====
           const nuevaRecurrencia = {
             tipo: recurrencia_tipo || 'diaria',
             intervalo: parseInt(recurrencia_intervalo) || 1,
@@ -407,14 +409,12 @@ exports.actualizarEstado = async (req, res) => {
             if (!isNaN(ff.getTime())) nuevaRecurrencia.fecha_fin = ff;
           }
           
-          // REEMPLAZAR el objeto completo (NO usar dot notation)
           setOps.recurrencia = nuevaRecurrencia;
           setOps.es_recurrente = true;
-          cambios.push(`Recurrencia: ACTIVADA (${nuevaRecurrencia.tipo})`);
-          console.log(`Recurrencia INICIALIZADA para ticket ${actual.numero_ticket}`);
+          cambios.push('Recurrencia: ACTIVADA (' + nuevaRecurrencia.tipo + ')');
+          console.log('Recurrencia INICIALIZADA para ticket ' + actual.numero_ticket);
           
         } else {
-          // ===== ACTUALIZAR RECURRENCIA EXISTENTE =====
           setOps.es_recurrente = true;
           setOps['recurrencia.activa'] = true;
           if (recurrencia_tipo) setOps['recurrencia.tipo'] = recurrencia_tipo;
@@ -428,11 +428,10 @@ exports.actualizarEstado = async (req, res) => {
           }
           if (dia_mes) setOps['recurrencia.dia_mes'] = parseInt(dia_mes);
           if (fecha_fin_recurrencia) setOps['recurrencia.fecha_fin'] = new Date(fecha_fin_recurrencia);
-          cambios.push(`Recurrencia: ACTIVADA (${recurrencia_tipo || actual.recurrencia.tipo})`);
-          console.log(`Recurrencia ACTUALIZADA para ticket ${actual.numero_ticket}`);
+          cambios.push('Recurrencia: ACTIVADA (' + (recurrencia_tipo || actual.recurrencia.tipo) + ')');
+          console.log('Recurrencia ACTUALIZADA para ticket ' + actual.numero_ticket);
         }
       } else {
-        // Desactivar recurrencia
         setOps.es_recurrente = false;
         if (tieneRecurrenciaValida) {
           setOps['recurrencia.activa'] = false;
@@ -453,7 +452,7 @@ exports.actualizarEstado = async (req, res) => {
       pushOps.historial = { 
         fecha: new Date(), 
         estado: estado || actual.estado, 
-        comentario: `Actualizaciones: ${cambios.join('; ')}`, 
+        comentario: 'Actualizaciones: ' + cambios.join('; '), 
         autor: req.user.email 
       };
     }
@@ -473,7 +472,6 @@ exports.actualizarEstado = async (req, res) => {
 
     if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada tras update' });
 
-    // ========== NOTIFICACIÓN DE ACTUALIZACIÓN ==========
     updated.APP_URL = resolveAppUrlFromReq(req);
     updated.ultimo_autor = req.user.email;
 
@@ -482,9 +480,9 @@ exports.actualizarEstado = async (req, res) => {
     if (destinatarios.length) {
       try {
         await enviarCorreoTicket(updated, destinatarios, null, 'estado');
-        console.log(`[ESTADO] Notificación enviada a ${destinatarios.length}: ${destinatarios.join(', ')}`);
+        console.log('[ESTADO] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
       } catch (correoError) {
-        console.error('Error al enviar correo de actualización:', correoError?.message || correoError);
+        console.error('Error al enviar correo de actualizacion:', correoError?.message || correoError);
       }
     }
 
@@ -498,6 +496,9 @@ exports.actualizarEstado = async (req, res) => {
 /* ==================== LISTAR TICKETS ==================== */
 exports.obtenerTickets = async (req, res) => {
   try {
+    console.log('obtenerTickets llamado');
+    console.log('req.user:', req.user);
+    
     const { estado, prioridad } = req.query;
     const userId = req.user.id;
     const isAdmin = req.user.rol === 'admin' || req.user.rol === 'soporte';
@@ -517,6 +518,8 @@ exports.obtenerTickets = async (req, res) => {
     
     if (estado) filtro.estado = estado;
     if (prioridad) filtro.prioridad = prioridad;
+
+    console.log('Filtro aplicado:', JSON.stringify(filtro));
 
     let tickets = await Ticket.find(filtro)
       .populate('usuario_id', 'email')
@@ -539,7 +542,7 @@ exports.obtenerTickets = async (req, res) => {
       return getTs(b) - getTs(a);
     });
 
-    console.log(`Usuario ${req.user.email} (${req.user.rol}) - Tareas encontradas: ${tickets.length}`);
+    console.log('Usuario ' + req.user.email + ' (' + req.user.rol + ') - Tareas encontradas: ' + tickets.length);
     res.json(tickets);
   } catch (err) {
     console.error('Error al obtener tareas:', err.message);
@@ -551,7 +554,7 @@ exports.obtenerTickets = async (req, res) => {
 exports.obtenerTicketPorId = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'ID inválido' });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'ID invalido' });
 
     const ticket = await Ticket.findById(id)
       .populate('usuario_id', 'email')
@@ -567,7 +570,7 @@ exports.obtenerTicketPorId = async (req, res) => {
       return res.status(403).json({ error: 'No autorizado para ver esta tarea' });
     }
     if (!esAdmin && ticket.estado === 'archivada') {
-      return res.status(403).json({ error: 'Esta tarea ha sido archivada y no está disponible' });
+      return res.status(403).json({ error: 'Esta tarea ha sido archivada y no esta disponible' });
     }
 
     res.json(ticket);
@@ -577,12 +580,12 @@ exports.obtenerTicketPorId = async (req, res) => {
   }
 };
 
-/* ==================== MARCAR LEÍDO ==================== */
+/* ==================== MARCAR LEIDO ==================== */
 exports.marcarLeido = async (req, res) => {
   try {
     const { id } = req.params;
     const usuario = req.user.email;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ mensaje: 'ID inválido' });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ mensaje: 'ID invalido' });
 
     let updated = await Ticket.findOneAndUpdate(
       { _id: id, 'leidoPor.usuario': usuario },
@@ -599,8 +602,8 @@ exports.marcarLeido = async (req, res) => {
     if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
     res.json(updated);
   } catch (err) {
-    console.error('Error al marcar tarea como leída:', err.message);
-    res.status(500).json({ error: 'Error al marcar tarea como leída' });
+    console.error('Error al marcar tarea como leida:', err.message);
+    res.status(500).json({ error: 'Error al marcar tarea como leida' });
   }
 };
 
@@ -620,7 +623,7 @@ exports.eliminarTicket = async (req, res) => {
 exports.generarEventoCalendar = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ mensaje: 'ID inválido' });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ mensaje: 'ID invalido' });
 
     const ticket = await Ticket.findById(id).select('asunto descripcion fecha_vencimiento numero_ticket');
     if (!ticket || !ticket.fecha_vencimiento) {
@@ -631,19 +634,19 @@ exports.generarEventoCalendar = async (req, res) => {
     const end = new Date(start);
     end.setHours(start.getHours() + 1);
 
-    const cal = ical({ name: `Ticket #${ticket.numero_ticket}`, timezone: 'America/Buenos_Aires' });
+    const cal = ical({ name: 'Ticket #' + ticket.numero_ticket, timezone: 'America/Buenos_Aires' });
     const appUrl = resolveAppUrlFromReq(req);
 
     cal.createEvent({
       start, end,
-      summary: `[TICKET #${ticket.numero_ticket}] ${ticket.asunto}`,
-      description: `Vencimiento del ticket.\n\nDescripción:\n${ticket.descripcion}\n\nAcceso rápido: ${appUrl}/tickets/${ticket._id}`,
-      url: `${appUrl}/tickets/${ticket._id}`,
-      uid: `ticket-${ticket.numero_ticket}@portfolioinvestment.com.ar`
+      summary: '[TICKET #' + ticket.numero_ticket + '] ' + ticket.asunto,
+      description: 'Vencimiento del ticket.\n\nDescripcion:\n' + ticket.descripcion + '\n\nAcceso rapido: ' + appUrl + '/tickets/' + ticket._id,
+      url: appUrl + '/tickets/' + ticket._id,
+      uid: 'ticket-' + ticket.numero_ticket + '@portfolioinvestment.com.ar'
     });
 
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="ticket-${ticket.numero_ticket}.ics"`);
+    res.setHeader('Content-Disposition', 'attachment; filename="ticket-' + ticket.numero_ticket + '.ics"');
     cal.stream(res);
   } catch (err) {
     console.error('Error al generar evento de calendario:', err);
@@ -653,7 +656,7 @@ exports.generarEventoCalendar = async (req, res) => {
 
 /* ==================== SCHEDULER: NOTIFICACIONES DE VENCIMIENTO ==================== */
 exports.revisarTicketsProximosAVencer = async () => {
-  console.log('Iniciando revisión de tickets para recordatorios...');
+  console.log('Iniciando revision de tickets para recordatorios...');
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -695,7 +698,7 @@ exports.revisarTicketsProximosAVencer = async () => {
       return;
     }
 
-    console.log(`Encontrados ${tickets.length} tickets para recordatorio.`);
+    console.log('Encontrados ' + tickets.length + ' tickets para recordatorio.');
 
     for (const ticket of tickets) {
       const destinatarios = await getDestinatariosNotificacion(ticket, null, 'estado');
@@ -709,17 +712,17 @@ exports.revisarTicketsProximosAVencer = async () => {
           { _id: ticket._id },
           { $set: { last_vencimiento_notification: new Date() } }
         );
-        console.log(`[VENCIMIENTO] Recordatorio #${ticket.numero_ticket} - ${destinatarios.length} destinatarios`);
+        console.log('[VENCIMIENTO] Recordatorio #' + ticket.numero_ticket + ' - ' + destinatarios.length + ' destinatarios');
       }
     }
   } catch (err) {
-    console.error('Error en revisión de tickets:', err);
+    console.error('Error en revision de tickets:', err);
   }
 };
 
 /* ==================== GENERAR TICKETS RECURRENTES ==================== */
 exports.generarTicketsRecurrentes = async () => {
-  console.log(`[${new Date().toISOString()}] Generando tickets recurrentes...`);
+  console.log('[' + new Date().toISOString() + '] Generando tickets recurrentes...');
   
   try {
     const ahora = new Date();
@@ -738,7 +741,7 @@ exports.generarTicketsRecurrentes = async () => {
       ]
     }).populate('usuario_id', 'email').populate('asignados', 'email');
     
-    console.log(`${ticketsRecurrentes.length} tickets recurrentes activos`);
+    console.log(ticketsRecurrentes.length + ' tickets recurrentes activos');
     let generados = 0;
     
     for (const ticket of ticketsRecurrentes) {
@@ -768,7 +771,7 @@ exports.generarTicketsRecurrentes = async () => {
               historial: [{
                 fecha: new Date(),
                 estado: 'pendiente',
-                comentario: `Tarea generada automáticamente por recurrencia desde Ticket #${ticket.numero_ticket}`,
+                comentario: 'Tarea generada automaticamente por recurrencia desde Ticket #' + ticket.numero_ticket,
                 autor: 'sistema'
               }],
               leidoPor: []
@@ -780,7 +783,7 @@ exports.generarTicketsRecurrentes = async () => {
             });
             
             generados++;
-            console.log(`Generado Ticket #${nuevoTicket.numero_ticket} para ${proximaFecha.toLocaleDateString('es-AR')}`);
+            console.log('Generado Ticket #' + nuevoTicket.numero_ticket + ' para ' + proximaFecha.toLocaleDateString('es-AR'));
             
             try {
               const appUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -788,33 +791,33 @@ exports.generarTicketsRecurrentes = async () => {
               const destinatarios = await getDestinatariosNotificacion(ticket, null, 'estado');
               if (destinatarios.length) {
                 await enviarCorreoTicket(nuevoTicket, destinatarios, null, 'tarea_recurrente');
-                console.log(`[RECURRENCIA] Notificación enviada a ${destinatarios.length} destinatarios`);
+                console.log('[RECURRENCIA] Notificacion enviada a ' + destinatarios.length + ' destinatarios');
               }
             } catch (mailError) {
-              console.error(`Error enviando email de recurrencia: ${mailError.message}`);
+              console.error('Error enviando email de recurrencia:', mailError.message);
             }
           }
         }
       } catch (innerError) {
-        console.error(`Error procesando ticket recurrente #${ticket.numero_ticket}:`, innerError.message);
+        console.error('Error procesando ticket recurrente #' + ticket.numero_ticket + ':', innerError.message);
       }
     }
     
-    console.log(`Generación completada: ${generados} nuevos tickets`);
+    console.log('Generacion completada: ' + generados + ' nuevos tickets');
     return { generados, revisados: ticketsRecurrentes.length };
   } catch (error) {
-    console.error('Error en generación de tickets recurrentes:', error);
+    console.error('Error en generacion de tickets recurrentes:', error);
     throw error;
   }
 };
 
-/* ==================== ACTUALIZAR CONFIGURACIÓN DE RECURRENCIA ==================== */
+/* ==================== ACTUALIZAR CONFIGURACION DE RECURRENCIA ==================== */
 exports.actualizarRecurrencia = async (req, res) => {
   try {
     const { id } = req.params;
     const { activa, tipo, intervalo, solo_dias_habiles, dias_semana, dia_mes, fecha_fin } = req.body;
     
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'ID inválido' });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'ID invalido' });
     
     const ticket = await Ticket.findById(id);
     if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
@@ -832,13 +835,13 @@ exports.actualizarRecurrencia = async (req, res) => {
       try {
         const dias = typeof dias_semana === 'string' ? JSON.parse(dias_semana) : dias_semana;
         if (!Array.isArray(dias) || !dias.every(d => [0,1,2,3,4,5,6].includes(d))) {
-          return res.status(400).json({ error: 'Días de semana inválidos' });
+          return res.status(400).json({ error: 'Dias de semana invalidos' });
         }
         updateOps['recurrencia.dias_semana'] = dias;
-      } catch (e) { return res.status(400).json({ error: 'Formato inválido para días de semana' }); }
+      } catch (e) { return res.status(400).json({ error: 'Formato invalido para dias de semana' }); }
     }
-    if (dia_mes) { const dia = parseInt(dia_mes); if (dia < 1 || dia > 31) return res.status(400).json({ error: 'Día del mes inválido' }); updateOps['recurrencia.dia_mes'] = dia; }
-    if (fecha_fin) { const ff = new Date(fecha_fin); if (isNaN(ff.getTime())) return res.status(400).json({ error: 'Fecha fin inválida' }); updateOps['recurrencia.fecha_fin'] = ff; }
+    if (dia_mes) { const dia = parseInt(dia_mes); if (dia < 1 || dia > 31) return res.status(400).json({ error: 'Dia del mes invalido' }); updateOps['recurrencia.dia_mes'] = dia; }
+    if (fecha_fin) { const ff = new Date(fecha_fin); if (isNaN(ff.getTime())) return res.status(400).json({ error: 'Fecha fin invalida' }); updateOps['recurrencia.fecha_fin'] = ff; }
     
     if (Object.keys(updateOps).length === 0) return res.status(400).json({ error: 'No se especificaron cambios' });
     
@@ -848,12 +851,12 @@ exports.actualizarRecurrencia = async (req, res) => {
     updated.historial.push({
       fecha: new Date(),
       estado: updated.estado,
-      comentario: `Configuración de recurrencia actualizada por ${req.user.email}`,
+      comentario: 'Configuracion de recurrencia actualizada por ' + req.user.email,
       autor: req.user.email
     });
     await updated.save();
     
-    res.json({ success: true, message: 'Configuración de recurrencia actualizada', ticket: updated });
+    res.json({ success: true, message: 'Configuracion de recurrencia actualizada', ticket: updated });
   } catch (error) {
     console.error('Error al actualizar recurrencia:', error);
     res.status(500).json({ error: 'Error al actualizar recurrencia', detalle: error.message });
@@ -870,7 +873,7 @@ exports.actualizarEventosCalendario = async (ticketId, oldDate, newDate) => {
       try {
         const googleCalendarService = require('../services/googleCalendar.service');
         await googleCalendarService.updateEvent(ticket.usuario_id, ticket.google_event_id, {
-          summary: `[Ticket #${ticket.numero_ticket}] ${ticket.asunto}`,
+          summary: '[Ticket #' + ticket.numero_ticket + '] ' + ticket.asunto,
           description: ticket.descripcion,
           startDateTime: newDate.toISOString(),
           endDateTime: new Date(newDate.getTime() + 60 * 60 * 1000).toISOString(),
@@ -883,7 +886,7 @@ exports.actualizarEventosCalendario = async (ticketId, oldDate, newDate) => {
       try {
         const outlookCalendarService = require('../services/outlookCalendar.service');
         await outlookCalendarService.updateEvent(ticket.usuario_id, ticket.outlook_event_id, {
-          summary: `[Ticket #${ticket.numero_ticket}] ${ticket.asunto}`,
+          summary: '[Ticket #' + ticket.numero_ticket + '] ' + ticket.asunto,
           description: ticket.descripcion,
           startDateTime: newDate.toISOString(),
           endDateTime: new Date(newDate.getTime() + 60 * 60 * 1000).toISOString(),
@@ -892,11 +895,11 @@ exports.actualizarEventosCalendario = async (ticketId, oldDate, newDate) => {
         updates.push('Outlook Calendar');
       } catch (err) { console.error('Error Outlook Calendar:', err.message); }
     }
-    if (updates.length) console.log(`Eventos actualizados en ${updates.join(', ')} para ticket ${ticket.numero_ticket}`);
+    if (updates.length) console.log('Eventos actualizados en ' + updates.join(', ') + ' para ticket ' + ticket.numero_ticket);
   } catch (err) { console.error('Error actualizando eventos:', err); }
 };
 
-/* ==================== ASIGNACIÓN DE USUARIOS ==================== */
+/* ==================== ASIGNACION DE USUARIOS ==================== */
 exports.obtenerAsignados = async (req, res) => {
   try {
     const ticket = await Ticket.findById(req.params.id).populate('asignados', 'email nombre rol');
@@ -916,7 +919,7 @@ exports.asignarUsuario = async (req, res) => {
     
     if (!ticket.asignados) ticket.asignados = [];
     if (ticket.asignados.some(a => (a._id || a).toString() === usuarioId)) {
-      return res.status(400).json({ error: 'El usuario ya está asignado' });
+      return res.status(400).json({ error: 'El usuario ya esta asignado' });
     }
     
     if (ticket.prioridad && typeof ticket.prioridad === 'string') {
@@ -926,7 +929,7 @@ exports.asignarUsuario = async (req, res) => {
     ticket.asignados.push(usuarioId);
     ticket.historial.push({
       fecha: new Date(), estado: ticket.estado,
-      comentario: `Usuario ${usuario.email} asignado a la tarea por ${req.user.email}`,
+      comentario: 'Usuario ' + usuario.email + ' asignado a la tarea por ' + req.user.email,
       autor: req.user.email
     });
     await ticket.save();
@@ -937,10 +940,10 @@ exports.asignarUsuario = async (req, res) => {
     const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'asignacion');
     if (destinatarios.length) {
       await enviarCorreoTicket(ticket.toObject(), destinatarios, null, 'asignacion_usuario');
-      console.log(`[ASIGNAR] Notificación enviada a ${destinatarios.length}: ${destinatarios.join(', ')}`);
+      console.log('[ASIGNAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
     
-    res.json({ success: true, message: `Usuario ${usuario.email} asignado correctamente` });
+    res.json({ success: true, message: 'Usuario ' + usuario.email + ' asignado correctamente' });
   } catch (error) { console.error('Error al asignar usuario:', error); res.status(500).json({ error: 'Error al asignar usuario' }); }
 };
 
@@ -959,7 +962,7 @@ exports.desasignarUsuario = async (req, res) => {
     ticket.asignados = (ticket.asignados || []).filter(a => (a._id || a).toString() !== usuarioId);
     ticket.historial.push({
       fecha: new Date(), estado: ticket.estado,
-      comentario: `Usuario ${usuario?.email || usuarioId} desasignado de la tarea por ${req.user.email}`,
+      comentario: 'Usuario ' + (usuario?.email || usuarioId) + ' desasignado de la tarea por ' + req.user.email,
       autor: req.user.email
     });
     await ticket.save();
@@ -970,7 +973,7 @@ exports.desasignarUsuario = async (req, res) => {
     const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'desasignacion');
     if (destinatarios.length) {
       await enviarCorreoTicket(ticket.toObject(), destinatarios, null, 'desasignacion_usuario');
-      console.log(`[DESASIGNAR] Notificación enviada a ${destinatarios.length}: ${destinatarios.join(', ')}`);
+      console.log('[DESASIGNAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
     
     res.json({ success: true, message: 'Usuario desasignado correctamente' });
@@ -980,6 +983,9 @@ exports.desasignarUsuario = async (req, res) => {
 /* OBTENER USUARIOS DISPONIBLES PARA ASIGNAR */
 exports.obtenerUsuariosDisponibles = async (req, res) => {
   try {
+    console.log('obtenerUsuariosDisponibles llamado');
+    console.log('req.user:', req.user);
+    
     const esAdmin = req.user.rol === 'admin';
     const esSoporte = req.user.rol === 'soporte';
     

@@ -1,3 +1,4 @@
+// backend/routes/ticket.routes.js
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -19,6 +20,8 @@ const {
   obtenerUsuariosDisponibles,
   actualizarRecurrencia
 } = require('../controllers/tickets.controller');
+
+console.log('=== CARGANDO TICKET ROUTES ===');
 
 const router = express.Router();
 
@@ -79,10 +82,7 @@ router.get('/:id/calendar', auth, generarEventoCalendar);
 /* =========================
    ENDPOINTS DE RECURRENCIA
    ========================= */
-// Actualizar configuración de recurrencia
 router.put('/:id/recurrencia', auth, actualizarRecurrencia);
-
-// Obtener configuración de recurrencia de un ticket
 router.get('/:id/recurrencia', auth, async (req, res) => {
   try {
     const Ticket = require('../models/ticket.model');
@@ -97,7 +97,7 @@ router.get('/:id/recurrencia', auth, async (req, res) => {
       numero_ticket: ticket.numero_ticket
     });
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener configuración' });
+    res.status(500).json({ error: 'Error al obtener configuracion' });
   }
 });
 
@@ -190,7 +190,7 @@ router.get('/:id/notificaciones/estado', auth, async (req, res) => {
 });
 
 /* =========================
-   ENDPOINTS DE ASIGNACIÓN DE USUARIOS
+   ENDPOINTS DE ASIGNACION DE USUARIOS
    ========================= */
 router.get('/:id/asignados', auth, obtenerAsignados);
 router.post('/:id/asignar', auth, asignarUsuario);
@@ -198,6 +198,5 @@ router.delete('/:id/asignar/:usuarioId', auth, desasignarUsuario);
 router.get('/usuarios/disponibles', auth, obtenerUsuariosDisponibles);
 
 console.log('=== TICKET ROUTES CARGADAS ===');
-
 
 module.exports = router;

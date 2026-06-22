@@ -8,7 +8,6 @@ try {
 } catch (err) {
   console.error('Error cargando app:', err.message);
   console.error('Stack:', err.stack);
-  // En Vercel, devolver un error 500 para ver en logs
   const express = require('express');
   const errorApp = express();
   errorApp.get('*', (req, res) => {

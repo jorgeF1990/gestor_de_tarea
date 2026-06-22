@@ -10,10 +10,34 @@
       "use": "@vercel/static"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
+      "src": "/health",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/ping-db",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/auth/(.*)",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/tickets/(.*)",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/admin/(.*)",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/calendar/(.*)",
+      "dest": "api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend-react/dist/$1"
     }
   ]
 }

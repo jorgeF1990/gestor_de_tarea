@@ -22,6 +22,25 @@ const {
 
 const router = express.Router();
 
+console.log('Rutas de tickets registradas:');
+console.log('  POST / (crear)');
+console.log('  GET / (listar)');
+console.log('  GET /:id');
+console.log('  PUT /:id/estado');
+console.log('  PUT /:id/comentario');
+console.log('  PUT /:id/leido');
+console.log('  DELETE /:id');
+console.log('  GET /:id/calendar');
+console.log('  GET /:id/recurrencia');
+console.log('  PUT /:id/recurrencia');
+console.log('  POST /:id/silenciar');
+console.log('  POST /:id/reanudar');
+console.log('  GET /:id/notificaciones/estado');
+console.log('  GET /:id/asignados');
+console.log('  POST /:id/asignar');
+console.log('  DELETE /:id/asignar/:usuarioId');
+console.log('  GET /usuarios/disponibles');
+
 /* =========================
    Multer a /uploads
    ========================= */
@@ -177,5 +196,8 @@ router.get('/:id/asignados', auth, obtenerAsignados);
 router.post('/:id/asignar', auth, asignarUsuario);
 router.delete('/:id/asignar/:usuarioId', auth, desasignarUsuario);
 router.get('/usuarios/disponibles', auth, obtenerUsuariosDisponibles);
+
+console.log('=== TICKET ROUTES CARGADAS ===');
+
 
 module.exports = router;

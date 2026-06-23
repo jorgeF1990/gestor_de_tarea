@@ -2,6 +2,8 @@
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const auth = require('../middlewares/authMiddleware');
 
@@ -45,14 +47,23 @@ console.log('  DELETE /:id/asignar/:usuarioId');
 console.log('  GET /usuarios/disponibles');
 
 /* =========================
-   Multer a /uploads
+   Cloudinary para subida de imagenes
    ========================= */
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '';
-    const base = path.basename(file.originalname, ext).replace(/\s+/g, '_');
-    cb(null, `${Date.now()}_${base}${ext}`);
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dfuybsomz',
+  api_key: process.env.CLOUDINARY_API_KEY || '99688937873469',
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'tickets',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
+    transformation: [
+      { width: 1000, height: 1000, crop: 'limit' },
+      { quality: 'auto' }
+    ]
   }
 });
 
@@ -62,7 +73,7 @@ const fileFilter = (_req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: storage,
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }
 });

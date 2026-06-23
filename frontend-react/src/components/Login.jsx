@@ -1,4 +1,4 @@
-// src/components/Login.jsx
+// frontend-react/src/components/Login.jsx
 import React, { useContext, useState } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
@@ -34,36 +34,47 @@ function Login() {
 
     try {
       setLoading(true);
-        const { data } = await axios.post(`${API}/auth/login`, 
+      console.log('Enviando petición a:', `${API}/auth/login`);
+      console.log('Email:', emailClean);
+      
+      const response = await axios.post(`${API}/auth/login`, 
         { email: emailClean, password: passClean },
-        { withCredentials: false } // ← Agregar esta línea
+        { withCredentials: false }
       );
 
-      if (!data?.token) {
+      console.log('Respuesta completa:', response);
+      console.log('Data:', response.data);
+      console.log('Token:', response.data?.token);
+
+      if (!response.data?.token) {
+        console.error('Token no encontrado en la respuesta');
         setMsg({ type:'err', text:'Respuesta inválida del servidor.' });
         return;
       }
 
       // Guardar token en localStorage
-      localStorage.setItem('token', data.token);
+      localStorage.setItem('token', response.data.token);
+      console.log('Token guardado en localStorage');
 
-      // Guarda token vía contexto (dispara re-render global)
-      await login(data.token, { remember });
+      // Guarda token vía contexto
+      if (login) {
+        await login(response.data.token, { remember });
+      }
 
-      // opcional: decode si necesitás algo local
-      try { jwtDecode(data.token); } catch {}
-
-      // Volver al Home (ya logueado)
-      navigate('/');
+      // Redirigir
+      navigate('/tickets');
     } catch (err) {
-      // Si hay 404, pista típica: ruta mal montada (/auth/auth/login)
+      console.error('Error en login:', err);
+      console.error('Response:', err.response);
+      console.error('Data:', err.response?.data);
+      
       if (err?.response?.status === 404) {
         setMsg({
           type:'err',
           text:`No se encontró la ruta de login. Verificá que el backend exponga POST ${API}/auth/login`
         });
       } else {
-        const text = err.response?.data?.error || 'No se pudo iniciar sesión.';
+        const text = err.response?.data?.message || err.response?.data?.error || 'No se pudo iniciar sesión.';
         setMsg({ type:'err', text });
       }
     } finally {

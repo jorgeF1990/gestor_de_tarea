@@ -1,10 +1,9 @@
 // backend/controllers/auth.controller.js
-
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { enviarCorreo } = require('../utils/mailer'); // IMPORT CORRECTO
+const { enviarCorreo } = require('../utils/mailer');
 
 // Registro
 exports.register = async (req, res) => {
@@ -28,23 +27,28 @@ exports.register = async (req, res) => {
 // Login
 exports.login = async (req, res) => {
   try {
-    // DEBUG - logs temporales
-    console.log('--- LOGIN REQUEST ---');
+    console.log('=== LOGIN REQUEST ===');
     console.log('Headers:', req.headers);
     console.log('Body:', req.body);
     console.log('JWT_SECRET presente:', !!process.env.JWT_SECRET);
 
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: 'Email y contraseña requeridos' });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email y contraseña requeridos' });
+    }
 
     const usuario = await User.findOne({ email });
     console.log('Usuario encontrado:', !!usuario);
-    if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
+    if (!usuario) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
 
     console.log('Hash guardado (inicio):', usuario.password ? usuario.password.slice(0, 30) + '...' : 'no hay hash');
     const passwordValida = await bcrypt.compare(password, usuario.password);
     console.log('Resultado bcrypt.compare:', passwordValida);
-    if (!passwordValida) return res.status(401).json({ message: 'Contraseña incorrecta' });
+    if (!passwordValida) {
+      return res.status(401).json({ message: 'Contraseña incorrecta' });
+    }
 
     const token = jwt.sign(
       { id: usuario._id, rol: usuario.rol, email: usuario.email },
@@ -52,13 +56,24 @@ exports.login = async (req, res) => {
       { expiresIn: '8h' }
     );
 
-    res.status(200).json({
-      token,
-      usuario: { nombre: usuario.nombre, email: usuario.email, rol: usuario.rol }
+    console.log('Token generado:', !!token);
+    console.log('=== LOGIN RESPONSE ===');
+
+    // RESPONSE CORRECTO CON TOKEN
+    return res.status(200).json({
+      token: token,
+      usuario: {
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol
+      }
     });
   } catch (err) {
     console.error('Error en login:', err);
-    res.status(500).json({ message: 'Error al iniciar sesión' });
+    return res.status(500).json({ 
+      message: 'Error al iniciar sesión',
+      error: err.message 
+    });
   }
 };
 
@@ -71,26 +86,22 @@ exports.recuperarPassword = async (req, res) => {
     const usuario = await User.findOne({ email });
     if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
 
-    // generar token seguro
     const token = crypto.randomBytes(32).toString('hex');
     usuario.resetToken = token;
-    usuario.resetTokenExpira = Date.now() + 3600000; // 1 hora
+    usuario.resetTokenExpira = Date.now() + 3600000;
     await usuario.save();
 
-    // Construir enlace apuntando al FRONTEND si está configurado, si no fallback al host de la request (backend)
     const FRONTEND_URL = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
-    const fallbackUrl = `${req.protocol}://${req.get('host')}`; // ej. http://localhost:5001
+    const fallbackUrl = `${req.protocol}://${req.get('host')}`;
     const appFrontend = FRONTEND_URL || fallbackUrl;
-    const enlace = `${appFrontend}/reset/${token}`; // recomendado: frontend manejará /reset/:token
+    const enlace = `${appFrontend}/reset/${token}`;
 
-    // enviar correo
     try {
       const asunto = 'Recuperación de contraseña';
       const texto = `Hacé clic o pegá el enlace en tu navegador para restablecer la contraseña:\n\n${enlace}\n\nEl enlace expira en 1 hora.`;
       await enviarCorreo(usuario.email, asunto, texto);
     } catch (mailErr) {
       console.error('Error enviando mail de recuperación:', mailErr);
-      // limpiar token si falla el envío
       usuario.resetToken = undefined;
       usuario.resetTokenExpira = undefined;
       await usuario.save();
@@ -108,10 +119,8 @@ exports.recuperarPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
-
-    // soporta JSON y form-urlencoded (desde el formulario HTML)
     const nuevaPassword = req.body.nuevaPassword || req.body.password || req.body.newPassword;
-    // DEBUG - logs temporales
+    
     console.log('--- RESET PASSWORD ---');
     console.log('Token:', token);
     console.log('Nueva password recibida:', nuevaPassword ? '[OCULTA]' : 'no recibida');
@@ -130,11 +139,9 @@ exports.resetPassword = async (req, res) => {
     usuario.resetTokenExpira = undefined;
     await usuario.save();
 
-    // DEBUG - después de guardar
     console.log('Nuevo hash guardado (inicio):', usuario.password ? usuario.password.slice(0, 30) + '...' : 'ninguno');
     console.log('resetToken/resetTokenExpira limpios:', usuario.resetToken, usuario.resetTokenExpira);
 
-    // Si la petición vino de un formulario (no JSON) redirigimos a una página simple
     const accept = req.get('accept') || '';
     if (!accept.includes('application/json')) {
       return res.send('<p>Contraseña actualizada correctamente. Podés cerrar esta ventana.</p>');

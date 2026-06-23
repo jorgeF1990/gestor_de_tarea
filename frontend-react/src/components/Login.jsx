@@ -34,7 +34,10 @@ function Login() {
 
     try {
       setLoading(true);
-      const { data } = await axios.post(`${API}/auth/login`, { email: emailClean, password: passClean });
+        const { data } = await axios.post(`${API}/auth/login`, 
+        { email: emailClean, password: passClean },
+        { withCredentials: false } // ← Agregar esta línea
+      );
 
       if (!data?.token) {
         setMsg({ type:'err', text:'Respuesta inválida del servidor.' });

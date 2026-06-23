@@ -230,6 +230,7 @@ export default function Tickets() {
 
       const { data } = await axios.get(`${API}/tickets?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
+        withCredentials: false, // ← Agregar esta línea
       });
 
       // ORDENAR POR ACTIVIDAD (mas reciente primero)
@@ -419,8 +420,10 @@ export default function Tickets() {
       const fd = new FormData();
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
+      // En guardarComentario
       await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { 
-        headers: { Authorization: `Bearer ${token}` } 
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: false, // ← Agregar esta línea
       });
 
       await cargar();
@@ -440,8 +443,10 @@ export default function Tickets() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
+      // En markRead
       await axios.put(`${API}/tickets/${id}/leido`, {}, { 
-        headers: { Authorization: `Bearer ${token}` } 
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: false, // ← Agregar esta línea
       });
     } catch (e) {
       console.error('Error marcando como leido:', e);

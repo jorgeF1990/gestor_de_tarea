@@ -10,42 +10,42 @@
       "use": "@vercel/static"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/health",
-      "dest": "api/index.js"
+      "source": "/health",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/ping-db",
-      "dest": "api/index.js"
+      "source": "/ping-db",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/auth/(.*)",
-      "dest": "api/index.js"
+      "source": "/auth/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/tickets/(.*)",
-      "dest": "api/index.js"
+      "source": "/tickets/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/admin/(.*)",
-      "dest": "api/index.js"
+      "source": "/admin/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/calendar/(.*)",
-      "dest": "api/index.js"
+      "source": "/calendar/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "api/index.js"
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/",
-      "dest": "frontend-react/dist/index.html"
+      "source": "/",
+      "destination": "/frontend-react/dist/index.html"
     },
     {
-      "src": "/(.*)",
-      "dest": "frontend-react/dist/$1"
+      "source": "/(.*)",
+      "destination": "/frontend-react/dist/$1"
     }
   ]
 }

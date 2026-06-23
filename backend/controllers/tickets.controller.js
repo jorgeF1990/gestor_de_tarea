@@ -108,6 +108,19 @@ async function getDestinatariosNotificacion(ticket, actorEmail, accion) {
 
 /* ==================== CREAR TICKET ==================== */
 exports.crearTicket = async (req, res) => {
+  console.log('=== CREAR TICKET INICIO ===');
+  console.log('req.user:', req.user);
+  console.log('req.headers.authorization:', req.headers.authorization);
+  
+  // Verificar que req.user existe
+  if (!req.user || !req.user.id) {
+    console.error('ERROR: req.user no existe o no tiene id');
+    return res.status(401).json({ 
+      error: 'Usuario no autenticado correctamente',
+      detalle: 'No se encontro el usuario en la request'
+    });
+  }
+
   try {
     console.log('crearTicket llamado - body:', req.body);
     console.log('crearTicket llamado - user:', req.user);
@@ -248,10 +261,10 @@ exports.crearTicket = async (req, res) => {
     res.status(201).json(ticket);
   } catch (err) {
     console.error('Error al crear tarea:', err);
+    console.error('Stack:', err.stack);
     res.status(500).json({ error: 'Error al crear tarea', detalle: err.message });
   }
 };
-
 /* ==================== AGREGAR COMENTARIO ==================== */
 exports.agregarComentario = async (req, res) => {
   try {

@@ -130,7 +130,6 @@ exports.crearTicket = async (req, res) => {
     
     const asunto = (req.body?.asunto || '').toString().trim();
     const descripcion = (req.body?.descripcion || '').toString();
-    const imagen = req.file?.filename || null;
     
     let fecha_vencimiento = null;
     if (req.body?.fecha_vencimiento) {

@@ -44,6 +44,38 @@
       "dest": "frontend-react/dist/index.html"
     },
     {
+      "src": "/login",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/register",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/tickets",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/dashboard",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/stats",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/recuperar",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/reset/(.*)",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
+      "src": "/tareas/(.*)",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "frontend-react/dist/$1"
     }

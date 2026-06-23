@@ -808,7 +808,7 @@ export default function Tickets() {
                       {h.imagen && (
                         <div style={{ marginTop: 6 }}>
                           <a href={h.imagen} target="_blank" rel="noreferrer">
-                            <img src={h.imagen || '/placeholder.png'} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
+                            <img src={h.imagen || '/logo.png'} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
                           </a>
                         </div>
                       )}

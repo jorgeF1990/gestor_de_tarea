@@ -333,4 +333,12 @@ if (!process.env.VERCEL) {
   });
 }
 
+console.log('=== BACKEND APP ===');
+console.log('Rutas registradas:');
+console.log('  /auth');
+console.log('  /tickets');
+console.log('  /health');
+console.log('  /ping-db');
+console.log('===================');
+
 module.exports = app;

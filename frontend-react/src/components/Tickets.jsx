@@ -1,3 +1,4 @@
+// frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import './Tickets.css';
@@ -65,7 +66,7 @@ const headers = (token) => ({ Authorization: `Bearer ${token}` });
 const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado'];
 const prioOps = ['baja', 'media', 'alta'];
 
-/** Última actividad (ms) de un ticket */
+/** Ultima actividad (ms) de un ticket */
 const getActivityTs = (t) => {
   const created = t.createdAt || t.fecha_creacion;
   const updated = t.updatedAt || t.fecha_actualizacion;
@@ -82,7 +83,7 @@ const getActivityTs = (t) => {
   return Math.max(...times.filter(Boolean)) || 0;
 };
 
-/** ISO del último movimiento relevante (comentario/actualización) */
+/** ISO del ultimo movimiento relevante (comentario/actualizacion) */
 const lastISOFromTicket = (t) => {
   const last = t.historial?.[t.historial.length - 1];
   if (last?.fecha) return new Date(last.fecha).toISOString();
@@ -214,6 +215,12 @@ export default function Tickets() {
   };
 
   const cargar = async (silent = false) => {
+    if (!token) {
+      console.warn('No hay token, redirigiendo a login...');
+      window.location.href = '/login';
+      return;
+    }
+
     if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -221,10 +228,10 @@ export default function Tickets() {
       if (fPrio) params.append('prioridad', fPrio);
 
       const { data } = await axios.get(`${API}/tickets?${params.toString()}`, {
-        headers: headers(token),
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // ORDENAR POR ACTIVIDAD (más reciente primero)
+      // ORDENAR POR ACTIVIDAD (mas reciente primero)
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
       const prev = getSeen();
@@ -243,12 +250,18 @@ export default function Tickets() {
 
       if (changesCount > 0 && silent) {
         setNewsCount(changesCount);
-        showToast(`🔔 ${changesCount} ticket(s) con novedades`);
+        showToast(`${changesCount} ticket(s) con novedades`);
       }
 
       setChangesMap(newChanges);
       setTickets(ordered);
-    } catch {
+    } catch (error) {
+      console.error('Error cargando tickets:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        // Token invalido o expirado
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
       setTickets([]);
       setChangesMap({});
     } finally {
@@ -291,7 +304,7 @@ export default function Tickets() {
   };
 
   /* ======================
-     Búsqueda / orden / paginado (MEJORADO)
+     Busqueda / orden / paginado (MEJORADO)
      ====================== */
   const filtered = useMemo(() => {
     const textoBusqueda = q.trim().toLowerCase();
@@ -312,10 +325,10 @@ export default function Tickets() {
     let arr;
 
     if (!textoBusqueda) {
-      // Sin búsqueda: usar el array tal cual (ya ordenado por getActivityTs desc)
+      // Sin busqueda: usar el array tal cual (ya ordenado por getActivityTs desc)
       arr = [...tickets];
     } else {
-      // Con búsqueda: filtrar MANTENIENDO el orden original
+      // Con busqueda: filtrar MANTENIENDO el orden original
       arr = tickets.filter(t => {
         const numeroTicket = (t.numero_ticket || '').toString().toLowerCase();
         const asunto = (t.asunto || '').toLowerCase();
@@ -334,7 +347,7 @@ export default function Tickets() {
       arr = arr.filter(t => t.estado !== 'archivada');
     }
 
-    // SOLO reordenar si el usuario eligió otro criterio de ordenamiento
+    // SOLO reordenar si el usuario eligio otro criterio de ordenamiento
     if (sort.by !== 'actividad') {
       const dir = sort.dir === 'asc' ? 1 : -1;
 
@@ -394,17 +407,29 @@ export default function Tickets() {
     if (!current) return;
     if (!form.comentario && !form.archivo) return;
 
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+
     setSaving(true);
     try {
       const fd = new FormData();
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
-      await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { headers: headers(token) });
+      await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
 
       await cargar();
       cerrarDrawer();
     } catch (e) {
-      console.error(e);
+      console.error('Error guardando comentario:', e);
+      if (e.response?.status === 401 || e.response?.status === 403) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
     } finally {
       setSaving(false);
     }
@@ -412,9 +437,13 @@ export default function Tickets() {
 
   const markRead = async (id) => {
     try {
-      await axios.put(`${API}/tickets/${id}/leido`, {}, { headers: headers(token) });
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      await axios.put(`${API}/tickets/${id}/leido`, {}, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
     } catch (e) {
-      console.error(e);
+      console.error('Error marcando como leido:', e);
     }
   };
 
@@ -468,7 +497,7 @@ export default function Tickets() {
               <Search size={16} className="search-icon-input" />
               <input
                 className="tks-search"
-                placeholder="Buscar nº, asunto, descripción o correo..."
+                placeholder="Buscar nº, asunto, descripcion o correo..."
                 value={q}
                 onChange={(e) => { setQ(e.target.value); setPage(1); }}
               />
@@ -532,7 +561,7 @@ export default function Tickets() {
             {!loading && filtered.length === 0 && (
               <div className="empty">
                 {q ? (
-                  <>🔍 No se encontraron resultados para "<strong>{q}</strong>"</>
+                  <>No se encontraron resultados para "{q}"</>
                 ) : (
                   <><Inbox size={32} /> No hay resultados con los filtros actuales.</>
                 )}
@@ -645,7 +674,7 @@ export default function Tickets() {
           </div>
 
           <div className="drawer-body">
-            {/* Info básica */}
+            {/* Info basica */}
             <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -700,7 +729,7 @@ export default function Tickets() {
                     }}>
                       <RefreshCw size={12} />
                       {current.recurrencia.activa
-                        ? <>Cada {current.recurrencia.intervalo} {current.recurrencia.tipo}{current.recurrencia.solo_dias_habiles ? ' (días hábiles)' : ''}</>
+                        ? <>Cada {current.recurrencia.intervalo} {current.recurrencia.tipo}{current.recurrencia.solo_dias_habiles ? ' (dias habiles)' : ''}</>
                         : 'Inactiva'}
                     </div>
                   </div>
@@ -738,7 +767,7 @@ export default function Tickets() {
                 <label className="hint">Comentario</label>
                 <textarea
                   className="textarea"
-                  placeholder="Escribí un comentario (podés adjuntar imagen abajo)…"
+                  placeholder="Escribi un comentario (podes adjuntar imagen abajo)…"
                   value={form.comentario}
                   onChange={e => setForm(f => ({ ...f, comentario: e.target.value }))}
                 />

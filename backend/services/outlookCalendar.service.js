@@ -99,7 +99,7 @@ class OutlookCalendarService {
         body: { contentType: 'HTML', content: eventData.description },
         start: { dateTime: eventData.startDateTime, timeZone: eventData.timeZone || 'America/Buenos_Aires' },
         end: { dateTime: eventData.endDateTime, timeZone: eventData.timeZone || 'America/Buenos_Aires' },
-        location: { displayName: eventData.location || 'Portfolio Investment' },
+        location: { displayName: eventData.location || 'TaskNest' },
         isReminderOn: true,
         reminderMinutesBeforeStart: 30
       };

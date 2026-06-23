@@ -73,7 +73,7 @@ import {
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_BACKEND_URL;
-const BRAND_NAME = 'Portfolio Investment';
+const BRAND_NAME = 'TaskNest';
 const LOGO_URL = '/logo.png';
 
 export default function TareaDetail() {

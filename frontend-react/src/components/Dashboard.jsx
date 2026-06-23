@@ -797,7 +797,7 @@ function Dashboard() {
       <header className="topbar">
         <div className="brand">
           <img src="/logo.png" alt="Logo" className="dashboard-logo" />
-          <div className="brand-meta"><h1>Panel de Tareas</h1><p className="muted">Administración • Portfolio Investment</p></div>
+          <div className="brand-meta"><h1>Panel de Tareas</h1><p className="muted">Administración • TaskNest</p></div>
         </div>
         <div className="topbar-actions">
           <div className="view-selector">

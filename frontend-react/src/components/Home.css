@@ -1,13 +1,17 @@
-/* Contenedor principal */
+/* ============================================
+   CONTENEDOR PRINCIPAL
+   ============================================ */
 .home {
   min-height: calc(100dvh - 64px);
   display: grid;
   place-items: center;
-  background: #f7f7f8; /* gris muy claro */
+  background: #f7f7f8;
   padding: 24px;
 }
 
-/* Tarjeta central */
+/* ============================================
+   TARJETA CENTRAL
+   ============================================ */
 .home-card {
   width: 100%;
   max-width: 860px;
@@ -18,49 +22,88 @@
   padding: 24px;
 }
 
-/* Encabezado con logo */
+/* ============================================
+   ENCABEZADO CON LOGO - ACTUALIZADO
+   ============================================ */
 .home-header {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: center;
   border-bottom: 1px solid #efefef;
-  padding-bottom: 16px;
-  margin-bottom: 16px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
 }
 
 .home-logo {
-  width: 48px;
-  height: 48px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.home-logo:hover {
+  transform: scale(1.05);
+}
+
+.home-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .home-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 800;
   color: #1e1f25;
+  letter-spacing: -0.5px;
 }
 
 .home-subtitle {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: #6e717f;
+  font-weight: 400;
 }
 
-/* CTA cuando no hay user */
+/* ============================================
+   CTA CUANDO NO HAY USUARIO
+   ============================================ */
 .home-auth-cta {
   text-align: center;
-  padding: 16px 0 8px;
+  padding: 20px 0 12px;
+}
+
+.home-auth-cta .welcome-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.home-auth-cta h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e1f25;
+  margin: 0 0 8px 0;
+}
+
+.home-auth-cta p {
+  font-size: 15px;
+  color: #6e717f;
+  margin: 0 0 16px 0;
 }
 
 .home-auth-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
-  margin-top: 12px;
+  flex-wrap: wrap;
 }
 
-/* Sección formulario */
+/* ============================================
+   SECCIÓN FORMULARIO
+   ============================================ */
 .home-section-title {
   font-size: 16px;
   font-weight: 700;
@@ -68,7 +111,9 @@
   margin: 8px 0 12px;
 }
 
-/* Formulario */
+/* ============================================
+   FORMULARIO
+   ============================================ */
 .home-form {
   display: grid;
   gap: 14px;
@@ -77,8 +122,13 @@
 .form-group label {
   display: block;
   font-size: 13px;
+  font-weight: 600;
   color: #5b5f6b;
   margin-bottom: 6px;
+}
+
+.form-group label .label-icon {
+  margin-right: 4px;
 }
 
 .form-group input,
@@ -90,12 +140,20 @@
   background: #fbfbfc;
   color: #181a20;
   outline: none;
-  transition: border-color 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  font-family: inherit;
+  font-size: 14px;
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
-  border-color: #9aa0b4;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 
 .counter {
@@ -105,7 +163,70 @@
   margin-top: 4px;
 }
 
-/* Dropzone */
+/* ============================================
+   FILA DE DOS COLUMNAS (FECHA Y HORA)
+   ============================================ */
+.form-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.form-group.half {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* ============================================
+   WRAPPER CON ICONO PARA FECHA/HORA
+   ============================================ */
+.date-time-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.date-time-wrapper .input-icon {
+  position: absolute;
+  left: 12px;
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+  font-size: 16px;
+}
+
+.date-time-wrapper input {
+  width: 100%;
+  padding: 12px 12px 12px 38px;
+  border-radius: 10px;
+  border: 1px solid #e1e2e6;
+  background: #fbfbfc;
+  color: #181a20;
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.date-time-wrapper input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.date-time-wrapper input:hover {
+  border-color: #9aa0b4;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.4);
+  cursor: pointer;
+}
+
+/* ============================================
+   DROPZONE
+   ============================================ */
 .dropzone {
   border: 1px dashed #c9cbd3;
   border-radius: 12px;
@@ -126,10 +247,17 @@
   gap: 8px;
   color: #6d7282;
   font-size: 14px;
+  padding: 12px 0;
 }
 
 .dropzone-icon {
-  font-size: 22px;
+  font-size: 28px;
+  color: #9ca3af;
+}
+
+.dropzone-empty small.hint {
+  font-size: 11px;
+  color: #9ca3af;
 }
 
 .dropzone-preview {
@@ -155,23 +283,33 @@
   color: #4a4f5c;
 }
 
-/* Acciones */
+/* ============================================
+   ACCIONES DEL FORMULARIO
+   ============================================ */
 .form-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 6px;
+  flex-wrap: wrap;
 }
 
-/* Botones */
+/* ============================================
+   BOTONES
+   ============================================ */
 .btn {
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 10px 18px;
   font-weight: 700;
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
   transition: transform 60ms ease, background 120ms ease, border-color 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
 }
 
 .btn:active {
@@ -180,13 +318,18 @@
 
 .btn-primary {
   color: #fff;
-  background: #3b82f6;           /* azul claro */
+  background: #3b82f6;
   border-color: #3b82f6;
 }
 
 .btn-primary:hover {
   background: #2f6fe0;
   border-color: #2f6fe0;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
@@ -209,13 +352,34 @@
   background: #f4f5f8;
 }
 
-/* Alertas */
+.loader-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   ALERTAS
+   ============================================ */
 .home-alert {
   margin-top: 14px;
   border-radius: 12px;
-  padding: 12px;
+  padding: 12px 16px;
   font-size: 14px;
   border: 1px solid;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .home-alert.ok {
@@ -230,287 +394,267 @@
   border-color: #fecaca;
 }
 
-/* Footer */
+/* ============================================
+   FOOTER
+   ============================================ */
 .home-footer {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid #efefef;
   display: flex;
-  gap: 8px;
+  gap: 16px;
   align-items: center;
   flex-wrap: wrap;
   color: #6e717f;
   font-size: 13px;
 }
 
-.home-link {
+.home-footer .home-link {
   color: #2563eb;
   text-decoration: none;
 }
 
-.home-link:hover {
+.home-footer .home-link:hover {
   text-decoration: underline;
 }
 
-/* Responsivo */
-@media (max-width: 560px) {
-  .home-card { padding: 18px; }
-  .home-header { flex-direction: column; align-items: flex-start; }
-}
-
-input, textarea, select {
-  background: var(--input-bg);
-  color: var(--input-text);
-  border: 1px solid var(--input-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  outline: none;
-  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
-}
-input::placeholder, textarea::placeholder { color: var(--input-placeholder); }
-input:focus, textarea:focus, select:focus {
-  border-color: var(--link);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--link) 25%, transparent);
-}
-.card,
-.auth-card,
-.actions-card,
-.dashboard-ticket,
-.bell-panel {
-  background: var(--card-bg);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  box-shadow: 0 1px 0 rgba(0,0,0,.03);
-}
-
-/* Encabezados suaves */
-.auth-head,
-.actions-header,
-.dashboard-ticket-header,
-.bell-panel__head {
-  border-bottom: 1px solid var(--border-color);
-}
-/* ====== CAMPO FECHA ====== */
-input[type="date"] {
-  cursor: pointer;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.4);
-  cursor: pointer;
-}
-
-@media (prefers-color-scheme: dark) {
-  input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.8);
+/* ============================================
+   RESPONSIVE - MÓVIL
+   ============================================ */
+@media (max-width: 640px) {
+  .home {
+    padding: 12px;
+    min-height: calc(100dvh - 56px);
   }
-}
-/* Fila de dos columnas para fecha y hora */
-.form-row {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-}
 
-.form-group.half {
-  flex: 1;
-  min-width: 140px;
-}
+  .home-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
 
-/* Estilos para inputs de fecha y hora (mantiene consistencia) */
-input[type="date"],
-input[type="time"] {
-  width: 100%;
-  padding: 12px 12px;
-  border-radius: 10px;
-  border: 1px solid #e1e2e6;
-  background: #fbfbfc;
-  color: #181a20;
-  outline: none;
-  transition: border-color 120ms ease;
-  cursor: pointer;
-}
+  /* Logo más pequeño en móvil */
+  .home-logo {
+    width: 60px;
+    height: 60px;
+  }
 
-input[type="date"]:focus,
-input[type="time"]:focus {
-  border-color: #9aa0b4;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.4);
-  cursor: pointer;
-}
-
-/* Responsive para móviles */
-@media (max-width: 560px) {
-  .form-row {
-    flex-direction: column;
+  .home-header {
     gap: 14px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
   }
-  
-  .form-group.half {
+
+  .home-title {
+    font-size: 22px;
+  }
+
+  .home-subtitle {
+    font-size: 12px;
+  }
+
+  .home-auth-cta h2 {
+    font-size: 18px;
+  }
+
+  .home-auth-cta p {
+    font-size: 14px;
+  }
+
+  .home-auth-buttons {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .home-auth-buttons .btn {
     width: 100%;
+    max-width: 200px;
+    justify-content: center;
   }
-}
 
-/* ====== ICONOS Y MEJORAS PROFESIONALES ====== */
-
-/* Fila de dos columnas para fecha y hora */
-.form-row {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.form-group.half {
-  flex: 1;
-  min-width: 140px;
-}
-
-/* Wrapper para inputs de fecha y hora con icono */
-.date-time-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.date-time-wrapper .input-icon {
-  position: absolute;
-  left: 12px;
-  color: #9ca3af;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.date-time-wrapper input {
-  width: 100%;
-  padding: 12px 12px 12px 38px;
-  border-radius: 10px;
-  border: 1px solid #e1e2e6;
-  background: #fbfbfc;
-  color: #181a20;
-  outline: none;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.date-time-wrapper input:focus {
-  border-color: var(--link, #3b82f6);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.date-time-wrapper input:hover {
-  border-color: #9aa0b4;
-}
-
-/* Icono en labels */
-.label-icon {
-  margin-right: 4px;
-}
-
-/* Loader pequeño para botón */
-.loader-small {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-right: 8px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Dropzone mejorada con icono */
-.dropzone-icon {
-  margin-bottom: 8px;
-  color: #9ca3af;
-}
-
-.dropzone-empty small.hint {
-  font-size: 11px;
-  color: #9ca3af;
-  margin-top: 4px;
-}
-
-/* Welcome icon */
-.welcome-icon {
-  margin-bottom: 16px;
-  color: var(--brand, #4f46e5);
-}
-
-/* Mejora en botones con iconos */
-.btn-primary,
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Estilos para inputs de fecha y hora */
-input[type="date"],
-input[type="time"] {
-  width: 100%;
-  cursor: pointer;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.4);
-  cursor: pointer;
-  background: transparent;
-  position: relative;
-  right: 0;
-}
-
-@media (prefers-color-scheme: dark) {
-  .date-time-wrapper input {
-    background: #1e293b;
-    border-color: #475569;
-    color: #f1f5f9;
-  }
-  
-  .date-time-wrapper .input-icon {
-    color: #64748b;
-  }
-  
-  input[type="date"]::-webkit-calendar-picker-indicator,
-  input[type="time"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.8);
-  }
-}
-
-/* Responsive */
-@media (max-width: 560px) {
   .form-row {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .form-group.half {
     width: 100%;
+    min-width: unset;
   }
-  
+
   .btn-primary,
   .btn-secondary {
     width: 100%;
     justify-content: center;
   }
-  
-  .home-auth-buttons {
+
+  .form-actions {
     flex-direction: column;
   }
-  
-  .home-auth-buttons .btn {
+
+  .form-actions .btn {
     width: 100%;
     justify-content: center;
   }
+
+  .dropzone-preview img {
+    max-height: 150px;
+  }
+
+  .home-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   RESPONSIVE - TABLET
+   ============================================ */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .home-card {
+    max-width: 700px;
+    padding: 20px;
+  }
+
+  .home-logo {
+    width: 72px;
+    height: 72px;
+  }
+
+  .home-title {
+    font-size: 24px;
+  }
+}
+
+/* ============================================
+   MODO OSCURO - SOPORTE
+   ============================================ */
+[data-theme="dark"] .home {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .home-card {
+  background: #111827;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .home-header {
+  border-bottom-color: #374151;
+}
+
+[data-theme="dark"] .home-title {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .home-subtitle {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .home-auth-cta h2 {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .home-auth-cta p {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .form-group label {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group textarea,
+[data-theme="dark"] .date-time-wrapper input {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group textarea:focus,
+[data-theme="dark"] .date-time-wrapper input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .form-group input::placeholder,
+[data-theme="dark"] .form-group textarea::placeholder {
+  color: #64748b;
+}
+
+[data-theme="dark"] .date-time-wrapper .input-icon {
+  color: #64748b;
+}
+
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+[data-theme="dark"] .dropzone {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .dropzone:hover {
+  background: #263348;
+  border-color: #5b6b8a;
+}
+
+[data-theme="dark"] .dropzone-empty {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .dropzone-icon {
+  color: #64748b;
+}
+
+[data-theme="dark"] .btn-secondary {
+  background: #1e293b;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background: #263348;
+}
+
+[data-theme="dark"] .btn-ghost {
+  color: #e5e7eb;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .btn-ghost:hover {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .home-footer {
+  border-top-color: #374151;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .home-footer .home-link {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .home-alert.ok {
+  color: #86efac;
+  background: #052e16;
+  border-color: #166534;
+}
+
+[data-theme="dark"] .home-alert.err {
+  color: #fca5a5;
+  background: #450a0a;
+  border-color: #7f1d1d;
+}
+
+[data-theme="dark"] .counter {
+  color: #64748b;
+}
+
+[data-theme="dark"] .preview-meta .file-name {
+  color: #94a3b8;
 }

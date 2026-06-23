@@ -19,7 +19,7 @@ function Recuperar() {
   return (
     <div className="login-container">
       <img src="/logo.png" alt="Logo" className="login-logo" />
-      <h1 className="text-2xl font-bold text-black">Portfolio Investment</h1>
+      <h1 className="text-2xl font-bold text-black">TaskNest</h1>
       <h2>🔐 Recuperar contraseña</h2>
       <form onSubmit={handleSubmit} className="login-form">
         <input

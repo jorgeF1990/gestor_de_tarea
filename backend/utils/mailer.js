@@ -48,7 +48,7 @@ const esc = (s = '') =>
 /* URLs públicas */
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
 const BACKEND_URL  = (process.env.BACKEND_URL  || process.env.APP_URL || '').replace(/\/$/, '');
-const BRAND_NAME   = process.env.BRAND_NAME || 'Portfolio Investment';
+const BRAND_NAME   = process.env.BRAND_NAME || 'TaskNest';
 
 const makeImageUrl = (filename) => {
   if (!filename) return null;

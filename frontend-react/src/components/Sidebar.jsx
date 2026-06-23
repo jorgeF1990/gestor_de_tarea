@@ -31,7 +31,7 @@ export default function Sidebar({ open, onToggle }) {
         <Link to="/" className="sidebar-brand" onClick={maybeClose}>
           <img src="/logo.png" alt="Logo" className="sidebar-logo" />
           <div className="sidebar-brandtext">
-            <div className="sidebar-title">Portfolio Investment</div>
+            <div className="sidebar-title">TaskNest</div>
             <div className="sidebar-sub">Mesa de ayuda</div>
           </div>
         </Link>

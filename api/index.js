@@ -1,5 +1,8 @@
-console.log('=== API INDEX ===');
-console.log('Cargando backend/app.js...');
+console.log('=== API INDEX - VERSION COMPLETA ===');
+console.log('Directorio actual:', __dirname);
+console.log('Archivos en el directorio:', require('fs').readdirSync(__dirname));
+
+console.log('Intentando cargar backend/app.js...');
 
 try {
   const app = require('../backend/app.js');
@@ -13,9 +16,17 @@ try {
   
   const express = require('express');
   const errorApp = express();
+  errorApp.use(express.json());
   errorApp.get('*', (req, res) => {
     res.status(500).json({ 
       error: 'Error cargando backend', 
+      message: err.message,
+      stack: err.stack 
+    });
+  });
+  errorApp.post('*', (req, res) => {
+    res.status(500).json({ 
+      error: 'Error cargando backend (POST)', 
       message: err.message,
       stack: err.stack 
     });

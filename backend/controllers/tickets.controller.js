@@ -266,62 +266,97 @@ exports.crearTicket = async (req, res) => {
   }
 };
 /* ==================== AGREGAR COMENTARIO ==================== */
-exports.agregarComentario = async (req, res) => {
+exports.crearTicket = async (req, res) => {
+  console.log('=== CREAR TICKET - PASO 0 ===');
+  console.log('req.user:', req.user);
+  console.log('req.body:', req.body);
+  console.log('req.headers.authorization:', req.headers.authorization);
+  
+  // Verificar que req.user existe
+  if (!req.user || !req.user.id) {
+    console.error('ERROR: req.user no existe o no tiene id');
+    console.error('req.user completo:', JSON.stringify(req.user));
+    return res.status(401).json({ 
+      error: 'Usuario no autenticado correctamente',
+      detalle: 'No se encontro el usuario en la request'
+    });
+  }
+
   try {
-    const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ mensaje: 'ID invalido' });
-    }
-
-    const comentario = (req.body?.comentario || '').toString();
+    console.log('=== CREAR TICKET - PASO 1 ===');
+    console.log('req.user.id:', req.user.id);
+    console.log('req.user.email:', req.user.email);
+    
+    const asunto = (req.body?.asunto || '').toString().trim();
+    const descripcion = (req.body?.descripcion || '').toString();
     const imagen = req.file?.filename || null;
-
-    if (!comentario && !imagen) {
-      return res.status(400).json({ mensaje: 'Comentario o imagen requerido' });
+    
+    console.log('=== CREAR TICKET - PASO 2 ===');
+    console.log('Asunto:', asunto);
+    console.log('Descripcion:', descripcion);
+    console.log('Imagen:', imagen);
+    
+    if (!asunto) {
+      console.log('Asunto vacio - retornando 400');
+      return res.status(400).json({ error: 'El asunto es requerido' });
     }
-    
-    const base = await Ticket.findById(id)
-      .populate('usuario_id', 'email')
-      .populate('asignados', 'email nombre');
-    
-    if (!base) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
 
-    const histEntry = {
-      fecha: new Date(),
-      estado: base.estado,
-      comentario,
-      autor: req.user.email,
-      imagen
-    };
-    
-    const updated = await Ticket.findOneAndUpdate(
-      { _id: id },
-      {
-        $push: { historial: histEntry },
-        $pull: { leidoPor: { usuario: req.user.email } },
-        $set: { fecha_actualizacion: new Date() }
-      },
-      { new: true }
-    ).populate('usuario_id', 'email')
-     .populate('asignados', 'email nombre');
+    console.log('=== CREAR TICKET - PASO 3 ===');
+    const numeroCorto = generateShortId();
+    console.log('Numero ticket generado:', numeroCorto);
 
-    if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada tras update' });
+    console.log('=== CREAR TICKET - PASO 4 ===');
+    // Crear ticket simplificado para prueba
+    const ticket = new Ticket({
+      usuario_id: req.user.id,
+      asunto: asunto,
+      descripcion: descripcion || 'Sin descripcion',
+      numero_ticket: numeroCorto,
+      prioridad: 'media',
+      estado: 'pendiente',
+      imagen: imagen,
+      historial: [{
+        fecha: new Date(),
+        estado: 'pendiente',
+        comentario: 'Tarea creada.\nAsunto: ' + asunto + '\nDescripcion: ' + (descripcion || 'Sin descripcion'),
+        autor: req.user.email || 'sistema'
+      }],
+      leidoPor: [{ usuario: req.user.email || 'sistema', fecha: new Date() }]
+    });
 
-    updated.APP_URL = resolveAppUrlFromReq(req);
-    updated.ultimo_autor = req.user.email;
+    console.log('=== CREAR TICKET - PASO 5 ===');
+    console.log('Ticket creado, guardando...');
+    await ticket.save();
+    console.log('Ticket guardado, ID:', ticket._id);
 
-    const destinatarios = await getDestinatariosNotificacion(updated, req.user.email, 'comentario');
+    console.log('=== CREAR TICKET - PASO 6 ===');
+    await ticket.populate('usuario_id', 'email');
+    await ticket.populate('asignados', 'email nombre');
+
+    console.log('=== CREAR TICKET - PASO 7 ===');
+    ticket.APP_URL = resolveAppUrlFromReq(req);
+    ticket.ultimo_autor = req.user.email;
+
+    const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'crear');
     const imagenPath = imagen ? 'uploads/' + imagen : null;
     
     if (destinatarios.length) {
-      await enviarCorreoTicket(updated, destinatarios, imagenPath, 'comentario');
-      console.log('[COMENTARIO] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
+      try {
+        await enviarCorreoTicket(ticket, destinatarios, imagenPath, 'crear');
+        console.log('[CREAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
+      } catch (emailError) {
+        console.error('Error al enviar email:', emailError.message);
+      }
     }
 
-    res.json(updated);
+    console.log('=== CREAR TICKET - PASO 8 ===');
+    res.status(201).json(ticket);
+    console.log('=== CREAR TICKET - FIN ===');
   } catch (err) {
-    console.error('Error al agregar comentario:', err);
-    res.status(500).json({ error: 'Error al agregar comentario' });
+    console.error('=== ERROR EN CREAR TICKET ===');
+    console.error('Mensaje:', err.message);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ error: 'Error al crear tarea', detalle: err.message });
   }
 };
 

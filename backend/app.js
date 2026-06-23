@@ -34,6 +34,7 @@ const allowedOrigins = [
   FRONTEND_URL,
   'https://gestor-de-tarea-jorgesfb29-gmailcoms-projects.vercel.app',
   'https://gestor-de-tarea-sepia.vercel.app',
+  'https://gestor-de-tarea-axg2mnrvy-jorgesfb29-gmailcoms-projects.vercel.app',
   'http://localhost:3000',
   'http://localhost:5001'
 ].filter(Boolean);
@@ -45,7 +46,12 @@ app.use(cors({
       callback(null, true);
     } else {
       console.warn('Origen no permitido:', origin);
-      callback(null, true);
+      // En desarrollo, permitir todos para pruebas
+      if (process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

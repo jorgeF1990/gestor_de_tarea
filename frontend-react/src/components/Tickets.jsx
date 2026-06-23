@@ -215,6 +215,7 @@ export default function Tickets() {
   };
 
   const cargar = async (silent = false) => {
+    const token = localStorage.getItem('token');
     if (!token) {
       console.warn('No hay token, redirigiendo a login...');
       window.location.href = '/login';

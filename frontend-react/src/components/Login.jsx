@@ -41,6 +41,9 @@ function Login() {
         return;
       }
 
+      // Guardar token en localStorage
+      localStorage.setItem('token', data.token);
+
       // Guarda token vía contexto (dispara re-render global)
       await login(data.token, { remember });
 

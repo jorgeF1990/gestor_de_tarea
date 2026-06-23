@@ -431,7 +431,7 @@ export default function TareaDetail() {
                       <div className="historial-comentario">{h.comentario}</div>
                       {h.imagen && (
                         <div className="historial-imagen">
-                          <a href={`${API}/uploads/${h.imagen}`} target="_blank" rel="noreferrer">
+                          <a href={h.imagen} target="_blank" rel="noreferrer">
                             <Image size={14} /> Ver imagen adjunta
                           </a>
                         </div>

@@ -748,7 +748,7 @@ export default function Tickets() {
                     <Image size={14} /> Imagen adjunta
                   </span>
                   <div style={{ marginTop: 6 }}>
-                    <a href={`${API}/uploads/${current.imagen}`} target="_blank" rel="noreferrer">
+                    <a href={current.imagen} target="_blank" rel="noreferrer">
                       <img src={`${API}/uploads/${current.imagen}`} alt="Adjunto" width="200" style={{ border: '1px solid var(--border)', borderRadius: 12 }} />
                     </a>
                   </div>
@@ -807,7 +807,7 @@ export default function Tickets() {
                       <div><strong>{h.estado}</strong>: {h.comentario}</div>
                       {h.imagen && (
                         <div style={{ marginTop: 6 }}>
-                          <a href={`${API}/uploads/${h.imagen}`} target="_blank" rel="noreferrer">
+                          <a href={h.imagen} target="_blank" rel="noreferrer">
                             <img src={`${API}/uploads/${h.imagen}`} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
                           </a>
                         </div>

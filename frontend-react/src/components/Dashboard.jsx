@@ -677,8 +677,8 @@ function Dashboard() {
           {ticket.imagen && (
             <div className="ticket-image">
               <p><Image size={14} /> Imagen adjunta:</p>
-              <a href={`${API}/uploads/${ticket.imagen}`} target="_blank" rel="noopener noreferrer">
-                <img src={`${API}/uploads/${ticket.imagen}`} alt="Adjunto" />
+              <a href={ticket.imagen} target="_blank" rel="noopener noreferrer">
+                <img src={ticket.imagen || '/placeholder.png'} alt="Adjunto" />
               </a>
             </div>
           )}

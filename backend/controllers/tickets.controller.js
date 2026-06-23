@@ -110,6 +110,10 @@ async function getDestinatariosNotificacion(ticket, actorEmail, accion) {
 exports.crearTicket = async (req, res) => {
   console.log('=== CREAR TICKET INICIO ===');
   console.log('req.user:', req.user);
+  console.log('req.file:', req.file);
+  console.log('req.file.path:', req.file?.path);
+  console.log('req.file.filename:', req.file?.filename);
+  console.log('req.body:', req.body);
   console.log('req.headers.authorization:', req.headers.authorization);
   
   if (!req.user || !req.user.id) {
@@ -192,6 +196,9 @@ exports.crearTicket = async (req, res) => {
     }
     
     const numeroCorto = generateShortId();
+    // IMPORTANTE: req.file.path contiene la URL de Cloudinary
+    const imagen = req.file ? req.file.path : null; // ← URL de Cloudinary
+    console.log('Imagen URL guardada:', imagen);
 
     if (!asunto) {
       return res.status(400).json({ error: 'El asunto es requerido' });
@@ -228,7 +235,7 @@ exports.crearTicket = async (req, res) => {
       numero_ticket: numeroCorto,
       prioridad: 'media',
       estado: 'pendiente',
-      imagen,
+      imagen: imagen || null,
       fecha_vencimiento,
       es_recurrente: esRecurrente,
       recurrencia: configRecurrencia,

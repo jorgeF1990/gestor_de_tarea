@@ -79,7 +79,7 @@ const KANBAN_COLUMNS = [
 const colorEstado = {
   abierto: '#22c55e', pendiente: '#e11d48', en_proceso: '#f59e0b',
   resuelto: '#10b981', cerrado: '#64748b', reabierto: '#fb923c',
-  cancelado: '#ef4444', archivada: '#6b7280'
+  cancelado: '#ef4444', archivado: '#6b7280'
 };
 
 function Dashboard() {
@@ -394,7 +394,7 @@ function Dashboard() {
   };
 
   const archivarTicket = async (id, archivar = true) => {
-    const nuevoEstado = archivar ? 'archivada' : 'pendiente';
+    const nuevoEstado = archivar ? 'archivado' : 'pendiente';
     const result = await actualizarTicket(id, { nuevoEstado });
     if (result.ok) {
       showToast(archivar ? 'Tarea archivada' : 'Tarea restaurada', 'success');
@@ -439,7 +439,7 @@ function Dashboard() {
   const toggleTicket = (id) => setOpenAndFocus(id, !abiertos[id]);
   const isVencida = (ticket) => {
     if (!ticket?.fecha_vencimiento) return false;
-    if (['cerrado', 'resuelto', 'archivada'].includes(ticket.estado)) return false;
+    if (['cerrado', 'resuelto', 'archivado'].includes(ticket.estado)) return false;
     return new Date(ticket.fecha_vencimiento) < new Date();
   };
 
@@ -518,8 +518,8 @@ function Dashboard() {
   // Filtrado =======================================================
   const filteredTickets = useMemo(() => {
     let base = tickets;
-    if (viewMode === 'archivadas') base = tickets.filter(t => t.estado === 'archivada');
-    else base = tickets.filter(t => t.estado !== 'archivada');
+    if (viewMode === 'archivadas') base = tickets.filter(t => t.estado === 'archivado');
+    else base = tickets.filter(t => t.estado !== 'archivado');
 
     const texto = busquedaTexto.trim().toLowerCase();
     let result = [...base];
@@ -563,7 +563,7 @@ function Dashboard() {
   useEffect(() => { if (page > pages) setPage(pages); }, [pages, page]);
 
   const conteos = useMemo(() => {
-    const inicial = { abierto: 0, pendiente: 0, en_proceso: 0, resuelto: 0, cerrado: 0, reabierto: 0, cancelado: 0, archivada: 0, total: 0 };
+    const inicial = { abierto: 0, pendiente: 0, en_proceso: 0, resuelto: 0, cerrado: 0, reabierto: 0, cancelado: 0, archivado: 0, total: 0 };
     return tickets.reduce((acc, t) => {
       const est = String(t.estado || '').toLowerCase();
       if (acc.hasOwnProperty(est)) acc[est]++;
@@ -643,15 +643,15 @@ function Dashboard() {
             <strong>Tarea #{ticket.numero_ticket}</strong>
             <span className="chip-mini"><Clock size={12} /> {timeAgo(getActivityTs(ticket))}</span>
             {vencida && <span className="badge-vencido-header"><AlertCircle size={12} /> VENCIDA</span>}
-            {ticket.estado === 'archivada' && <span className="badge-archivada"><Archive size={12} /> Archivada</span>}
+            {ticket.estado === 'archivado' && <span className="badge-archivada"><Archive size={12} /> Archivada</span>}
           </div>
           <div className="ticket-actions-buttons">
-            {ticket.estado !== 'archivada' && (
+            {ticket.estado !== 'archivado' && (
               <button className="btn-icon" onClick={() => archivarTicket(ticket._id, true)} title="Archivar">
                 <Archive size={16} />
               </button>
             )}
-            {ticket.estado === 'archivada' && (
+            {ticket.estado === 'archivado' && (
               <button className="btn-icon" onClick={() => archivarTicket(ticket._id, false)} title="Restaurar">
                 <ArchiveRestore size={16} />
               </button>
@@ -850,7 +850,7 @@ function Dashboard() {
           <div className="resumen-card" style={{ borderLeftColor: colorEstado.en_proceso }}><PlayCircle size={16} /><div className="resumen-title">En proceso</div><div className="resumen-value">{conteos.en_proceso}</div></div>
           <div className="resumen-card" style={{ borderLeftColor: colorEstado.resuelto }}><CheckCircle size={16} /><div className="resumen-title">Resueltos</div><div className="resumen-value">{conteos.resuelto}</div></div>
           <div className="resumen-card" style={{ borderLeftColor: colorEstado.cerrado }}><Lock size={16} /><div className="resumen-title">Cerrados</div><div className="resumen-value">{conteos.cerrado}</div></div>
-          <div className="resumen-card total"><Layers size={16} /><div className="resumen-title">Total</div><div className="resumen-value">{conteos.total - conteos.archivada}</div></div>
+          <div className="resumen-card total"><Layers size={16} /><div className="resumen-title">Total</div><div className="resumen-value">{conteos.total - conteos.archivado}</div></div>
         </div>
       )}
 

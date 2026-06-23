@@ -40,7 +40,6 @@ import {
   Lock,
   FolderOpen,
   Archive,
-  ArchiveRestore,
   Save,
   Upload,
   FileText,
@@ -64,7 +63,7 @@ import {
 const API = import.meta.env.VITE_BACKEND_URL;
 const headers = (token) => ({ Authorization: `Bearer ${token}` });
 
-const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado', 'archivado'];
+const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado'];
 const prioOps = ['baja', 'media', 'alta'];
 
 /** Ultima actividad (ms) de un ticket */
@@ -231,9 +230,10 @@ export default function Tickets() {
 
       const { data } = await axios.get(`${API}/tickets?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false,
+        withCredentials: false, // ← Agregar esta línea
       });
 
+      // ORDENAR POR ACTIVIDAD (mas reciente primero)
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
       const prev = getSeen();
@@ -260,6 +260,7 @@ export default function Tickets() {
     } catch (error) {
       console.error('Error cargando tickets:', error);
       if (error.response?.status === 401 || error.response?.status === 403) {
+        // Token invalido o expirado
         localStorage.removeItem('token');
         window.location.href = '/login';
       }
@@ -310,6 +311,7 @@ export default function Tickets() {
   const filtered = useMemo(() => {
     const textoBusqueda = q.trim().toLowerCase();
 
+    // Obtener rol del usuario desde el token
     const userRol = (() => {
       try {
         const token = localStorage.getItem('token');
@@ -321,11 +323,14 @@ export default function Tickets() {
       return 'usuario';
     })();
 
+    // PARTIR del array original que ya viene ordenado por actividad
     let arr;
 
     if (!textoBusqueda) {
+      // Sin busqueda: usar el array tal cual (ya ordenado por getActivityTs desc)
       arr = [...tickets];
     } else {
+      // Con busqueda: filtrar MANTENIENDO el orden original
       arr = tickets.filter(t => {
         const numeroTicket = (t.numero_ticket || '').toString().toLowerCase();
         const asunto = (t.asunto || '').toLowerCase();
@@ -339,10 +344,12 @@ export default function Tickets() {
       });
     }
 
+    // ========== EXCLUIR TAREAS ARCHIVADAS PARA USUARIOS NO-ADMIN ==========
     if (userRol !== 'admin' && userRol !== 'soporte') {
-      arr = arr.filter(t => t.estado !== 'archivado');
+      arr = arr.filter(t => t.estado !== 'archivada');
     }
 
+    // SOLO reordenar si el usuario eligio otro criterio de ordenamiento
     if (sort.by !== 'actividad') {
       const dir = sort.dir === 'asc' ? 1 : -1;
 
@@ -413,9 +420,10 @@ export default function Tickets() {
       const fd = new FormData();
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
+      // En guardarComentario
       await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { 
         headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false,
+        withCredentials: false, // ← Agregar esta línea
       });
 
       await cargar();
@@ -435,9 +443,10 @@ export default function Tickets() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
+      // En markRead
       await axios.put(`${API}/tickets/${id}/leido`, {}, { 
         headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false,
+        withCredentials: false, // ← Agregar esta línea
       });
     } catch (e) {
       console.error('Error marcando como leido:', e);
@@ -450,25 +459,6 @@ export default function Tickets() {
     return new Date(ticket.fecha_vencimiento) < new Date();
   };
 
-  // ===== FUNCION PARA ARCHIVAR/RESTAURAR =====
-  const handleArchivar = async (id, archivar = true) => {
-    const token = localStorage.getItem('token');
-    const nuevoEstado = archivar ? 'archivado' : 'pendiente';
-    
-    try {
-      await axios.put(`${API}/tickets/${id}/estado`, 
-        { estado: nuevoEstado }, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await cargar();
-      cerrarDrawer();
-      showToast(archivar ? 'Tarea archivada correctamente' : 'Tarea restaurada correctamente');
-    } catch (e) {
-      console.error('Error al archivar/restaurar:', e);
-      showToast('Error al procesar la tarea', 'error');
-    }
-  };
-
   return (
     <div className="tks-wrap">
       <div className="tks-card">
@@ -478,6 +468,7 @@ export default function Tickets() {
               <Ticket size={20} style={{ display: 'inline', marginRight: 8 }} />
               Tareas
             </h2>
+            {/* Selector de vista */}
             <div className="tks-view-selector">
               <button
                 className={`tks-view-btn ${viewMode === 'lista' ? 'active' : ''}`}
@@ -549,6 +540,7 @@ export default function Tickets() {
           </div>
         </div>
 
+        {/* Leyenda de chips (solo en vista lista) */}
         {viewMode === 'lista' && (
           <div className="tks-legend">
             <span className="chip chip-new"> Nuevo</span>
@@ -562,12 +554,14 @@ export default function Tickets() {
           <div className="empty"><Loader2 size={24} className="spin" /> Cargando…</div>
         )}
 
+        {/* VISTA CALENDARIO */}
         {viewMode === 'calendario' && (
           <div className="tks-calendar-wrapper">
             <CalendarView tickets={filtered} />
           </div>
         )}
 
+        {/* VISTA LISTA */}
         {viewMode === 'lista' && (
           <>
             {!loading && filtered.length === 0 && (
@@ -728,6 +722,7 @@ export default function Tickets() {
                   </div>
                   <div>{current.usuario_id?.email || '—'}</div>
                 </div>
+                {/* Info de recurrencia */}
                 {current.es_recurrente && current.recurrencia && (
                   <div>
                     <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
@@ -827,32 +822,13 @@ export default function Tickets() {
           </div>
 
           <div className="drawer-foot">
-            <div className="drawer-actions-left">
-              {current.estado !== 'archivado' ? (
-                <button 
-                  className="tks-btn danger" 
-                  onClick={() => handleArchivar(current._id, true)}
-                >
-                  <Archive size={14} /> Archivar
-                </button>
-              ) : (
-                <button 
-                  className="tks-btn" 
-                  onClick={() => handleArchivar(current._id, false)}
-                >
-                  <ArchiveRestore size={14} /> Restaurar
-                </button>
-              )}
-            </div>
-            <div className="drawer-actions-right">
-              <button className="tks-btn ghost" onClick={cerrarDrawer}>
-                <X size={14} /> Cancelar
-              </button>
-              <button className="tks-btn" onClick={guardarComentario} disabled={saving}>
-                {saving ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
-                {saving ? 'Guardando...' : 'Guardar comentario'}
-              </button>
-            </div>
+            <button className="tks-btn ghost" onClick={cerrarDrawer}>
+              <X size={14} /> Cancelar
+            </button>
+            <button className="tks-btn" onClick={guardarComentario} disabled={saving}>
+              {saving ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+              {saving ? 'Guardando...' : 'Guardar comentario'}
+            </button>
           </div>
         </aside>
       )}

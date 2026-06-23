@@ -112,7 +112,6 @@ exports.crearTicket = async (req, res) => {
   console.log('req.user:', req.user);
   console.log('req.headers.authorization:', req.headers.authorization);
   
-  // Verificar que req.user existe
   if (!req.user || !req.user.id) {
     console.error('ERROR: req.user no existe o no tiene id');
     return res.status(401).json({ 
@@ -265,115 +264,76 @@ exports.crearTicket = async (req, res) => {
     res.status(500).json({ error: 'Error al crear tarea', detalle: err.message });
   }
 };
-/* ==================== AGREGAR COMENTARIO ==================== */
-exports.crearTicket = async (req, res) => {
-  console.log('=== CREAR TICKET - PASO 0 ===');
-  console.log('req.user:', req.user);
-  console.log('req.body:', req.body);
-  console.log('req.headers.authorization:', req.headers.authorization);
-  
-  // Verificar que req.user existe
-  if (!req.user || !req.user.id) {
-    console.error('ERROR: req.user no existe o no tiene id');
-    console.error('req.user completo:', JSON.stringify(req.user));
-    return res.status(401).json({ 
-      error: 'Usuario no autenticado correctamente',
-      detalle: 'No se encontro el usuario en la request'
-    });
-  }
 
+/* ==================== AGREGAR COMENTARIO ==================== */
+exports.agregarComentario = async (req, res) => {
   try {
-    console.log('=== CREAR TICKET - PASO 1 ===');
-    console.log('req.user.id:', req.user.id);
-    console.log('req.user.email:', req.user.email);
-    
-    const asunto = (req.body?.asunto || '').toString().trim();
-    const descripcion = (req.body?.descripcion || '').toString();
-    const imagen = req.file?.filename || null;
-    
-    console.log('=== CREAR TICKET - PASO 2 ===');
-    console.log('Asunto:', asunto);
-    console.log('Descripcion:', descripcion);
-    console.log('Imagen:', imagen);
-    
-    if (!asunto) {
-      console.log('Asunto vacio - retornando 400');
-      return res.status(400).json({ error: 'El asunto es requerido' });
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ mensaje: 'ID invalido' });
     }
 
-    console.log('=== CREAR TICKET - PASO 3 ===');
-    const numeroCorto = generateShortId();
-    console.log('Numero ticket generado:', numeroCorto);
+    const comentario = (req.body?.comentario || '').toString();
+    const imagen = req.file?.filename || null;
 
-    console.log('=== CREAR TICKET - PASO 4 ===');
-    // Crear ticket simplificado para prueba
-    const ticket = new Ticket({
-      usuario_id: req.user.id,
-      asunto: asunto,
-      descripcion: descripcion || 'Sin descripcion',
-      numero_ticket: numeroCorto,
-      prioridad: 'media',
-      estado: 'pendiente',
-      imagen: imagen,
-      historial: [{
-        fecha: new Date(),
-        estado: 'pendiente',
-        comentario: 'Tarea creada.\nAsunto: ' + asunto + '\nDescripcion: ' + (descripcion || 'Sin descripcion'),
-        autor: req.user.email || 'sistema'
-      }],
-      leidoPor: [{ usuario: req.user.email || 'sistema', fecha: new Date() }]
-    });
+    if (!comentario && !imagen) {
+      return res.status(400).json({ mensaje: 'Comentario o imagen requerido' });
+    }
+    
+    const base = await Ticket.findById(id)
+      .populate('usuario_id', 'email')
+      .populate('asignados', 'email nombre');
+    
+    if (!base) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
 
-    console.log('=== CREAR TICKET - PASO 5 ===');
-    console.log('Ticket creado, guardando...');
-    await ticket.save();
-    console.log('Ticket guardado, ID:', ticket._id);
+    const histEntry = {
+      fecha: new Date(),
+      estado: base.estado,
+      comentario,
+      autor: req.user.email,
+      imagen
+    };
+    
+    const updated = await Ticket.findOneAndUpdate(
+      { _id: id },
+      {
+        $push: { historial: histEntry },
+        $pull: { leidoPor: { usuario: req.user.email } },
+        $set: { fecha_actualizacion: new Date() }
+      },
+      { new: true }
+    ).populate('usuario_id', 'email')
+     .populate('asignados', 'email nombre');
 
-    console.log('=== CREAR TICKET - PASO 6 ===');
-    await ticket.populate('usuario_id', 'email');
-    await ticket.populate('asignados', 'email nombre');
+    if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada tras update' });
 
-    console.log('=== CREAR TICKET - PASO 7 ===');
-    ticket.APP_URL = resolveAppUrlFromReq(req);
-    ticket.ultimo_autor = req.user.email;
+    updated.APP_URL = resolveAppUrlFromReq(req);
+    updated.ultimo_autor = req.user.email;
 
-    const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'crear');
+    const destinatarios = await getDestinatariosNotificacion(updated, req.user.email, 'comentario');
     const imagenPath = imagen ? 'uploads/' + imagen : null;
     
     if (destinatarios.length) {
-      try {
-        await enviarCorreoTicket(ticket, destinatarios, imagenPath, 'crear');
-        console.log('[CREAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
-      } catch (emailError) {
-        console.error('Error al enviar email:', emailError.message);
-      }
+      await enviarCorreoTicket(updated, destinatarios, imagenPath, 'comentario');
+      console.log('[COMENTARIO] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
 
-    console.log('=== CREAR TICKET - PASO 8 ===');
-    res.status(201).json(ticket);
-    console.log('=== CREAR TICKET - FIN ===');
+    res.json(updated);
   } catch (err) {
-    console.error('=== ERROR EN CREAR TICKET ===');
-    console.error('Mensaje:', err.message);
-    console.error('Stack:', err.stack);
-    res.status(500).json({ error: 'Error al crear tarea', detalle: err.message });
+    console.error('Error al agregar comentario:', err);
+    res.status(500).json({ error: 'Error al agregar comentario' });
   }
 };
 
-/* ==================== ACTUALIZAR ESTADO/PRIORIDAD/FECHA/RECURRENCIA ==================== */
+/* ==================== ACTUALIZAR ESTADO ==================== */
 exports.actualizarEstado = async (req, res) => {
   try {
-    const { 
-      estado, prioridad, comentario, fecha_vencimiento,
-      es_recurrente, recurrencia_tipo, recurrencia_intervalo,
-      solo_dias_habiles, dias_semana, dia_mes, fecha_fin_recurrencia
-    } = req.body; 
-    
+    const { estado } = req.body;
     const { id } = req.params;
     const rol = req.user?.rol;
 
     if (!['admin','soporte'].includes(rol)) {
-      return res.status(403).json({ mensaje: 'No autorizado para cambiar estado o prioridad' });
+      return res.status(403).json({ mensaje: 'No autorizado para cambiar estado' });
     }
 
     if (!req.user?.email) {
@@ -383,161 +343,22 @@ exports.actualizarEstado = async (req, res) => {
       return res.status(400).json({ mensaje: 'ID invalido' });
     }
 
-    const actual = await Ticket.findById(id)
-      .populate('usuario_id', 'email')
-      .populate('asignados', 'email nombre');
-    
-    if (!actual) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
-
-    const cambios = [];
-    const setOps = {};
-    const pushOps = {};
-
-    // 1. Cambio de estado
-    if (estado && estado !== actual.estado) {
-      setOps.estado = estado;
-      cambios.push('Estado: ' + actual.estado + ' -> ' + estado);
-      if (estado === 'resuelto' || estado === 'cerrado') {
-        setOps.fecha_cierre = new Date();
-      }
-    }
-    
-    // 2. Cambio de prioridad (normalizar a minusculas)
-    if (prioridad && prioridad.toLowerCase() !== actual.prioridad) {
-      setOps.prioridad = prioridad.toLowerCase();
-      cambios.push('Prioridad: ' + actual.prioridad + ' -> ' + prioridad.toLowerCase());
+    const ticket = await Ticket.findById(id);
+    if (!ticket) {
+      return res.status(404).json({ mensaje: 'Tarea no encontrada' });
     }
 
-    // 3. Cambio de fecha de vencimiento
-    if (fecha_vencimiento) {
-      const newDate = new Date(fecha_vencimiento);
-      if (!isNaN(newDate.getTime())) {
-        const oldDateStr = actual.fecha_vencimiento ? new Date(actual.fecha_vencimiento).toISOString().substring(0, 10) : 'No definida';
-        const newDateStr = newDate.toISOString().substring(0, 10);
-        setOps.fecha_vencimiento = newDate;
-        cambios.push('Fecha Vencimiento: ' + oldDateStr + ' -> ' + newDateStr);
-        if (actual.recurrencia && actual.recurrencia.activa) {
-          setOps['recurrencia.fecha_inicio'] = newDate;
-        }
-      }
+    if (!estado) {
+      return res.status(400).json({ mensaje: 'Estado requerido' });
     }
 
-    // 4. Cambio de recurrencia
-    if (es_recurrente !== undefined && es_recurrente !== null) {
-      const esRecurrenteBool = es_recurrente === true || es_recurrente === 'true';
-      
-      const tieneRecurrenciaValida = actual.recurrencia && 
-                                     typeof actual.recurrencia === 'object' && 
-                                     actual.recurrencia.tipo;
-      
-      if (esRecurrenteBool) {
-        if (!tieneRecurrenciaValida) {
-          const nuevaRecurrencia = {
-            tipo: recurrencia_tipo || 'diaria',
-            intervalo: parseInt(recurrencia_intervalo) || 1,
-            solo_dias_habiles: solo_dias_habiles === true || solo_dias_habiles === 'true',
-            activa: true,
-            fecha_inicio: actual.fecha_vencimiento || new Date(),
-            ultima_generacion: new Date()
-          };
-          
-          if (recurrencia_tipo === 'semanal' && dias_semana) {
-            try {
-              const dias = typeof dias_semana === 'string' ? JSON.parse(dias_semana) : dias_semana;
-              if (Array.isArray(dias)) nuevaRecurrencia.dias_semana = dias;
-            } catch (e) {}
-          }
-          
-          if (recurrencia_tipo === 'mensual' && dia_mes) {
-            nuevaRecurrencia.dia_mes = parseInt(dia_mes);
-          }
-          
-          if (fecha_fin_recurrencia) {
-            const ff = new Date(fecha_fin_recurrencia);
-            if (!isNaN(ff.getTime())) nuevaRecurrencia.fecha_fin = ff;
-          }
-          
-          setOps.recurrencia = nuevaRecurrencia;
-          setOps.es_recurrente = true;
-          cambios.push('Recurrencia: ACTIVADA (' + nuevaRecurrencia.tipo + ')');
-          console.log('Recurrencia INICIALIZADA para ticket ' + actual.numero_ticket);
-          
-        } else {
-          setOps.es_recurrente = true;
-          setOps['recurrencia.activa'] = true;
-          if (recurrencia_tipo) setOps['recurrencia.tipo'] = recurrencia_tipo;
-          if (recurrencia_intervalo) setOps['recurrencia.intervalo'] = parseInt(recurrencia_intervalo);
-          if (solo_dias_habiles !== undefined) setOps['recurrencia.solo_dias_habiles'] = solo_dias_habiles === true || solo_dias_habiles === 'true';
-          if (dias_semana) {
-            try {
-              const dias = typeof dias_semana === 'string' ? JSON.parse(dias_semana) : dias_semana;
-              if (Array.isArray(dias)) setOps['recurrencia.dias_semana'] = dias;
-            } catch (e) {}
-          }
-          if (dia_mes) setOps['recurrencia.dia_mes'] = parseInt(dia_mes);
-          if (fecha_fin_recurrencia) setOps['recurrencia.fecha_fin'] = new Date(fecha_fin_recurrencia);
-          cambios.push('Recurrencia: ACTIVADA (' + (recurrencia_tipo || actual.recurrencia.tipo) + ')');
-          console.log('Recurrencia ACTUALIZADA para ticket ' + actual.numero_ticket);
-        }
-      } else {
-        setOps.es_recurrente = false;
-        if (tieneRecurrenciaValida) {
-          setOps['recurrencia.activa'] = false;
-        }
-        cambios.push('Recurrencia: DESACTIVADA');
-      }
-    }
+    ticket.estado = estado;
+    await ticket.save();
 
-    // 5. Comentario
-    if (comentario) {
-      pushOps.historial = { 
-        fecha: new Date(), 
-        estado: estado || actual.estado, 
-        comentario: comentario.toString(), 
-        autor: req.user.email 
-      };
-    } else if (cambios.length) {
-      pushOps.historial = { 
-        fecha: new Date(), 
-        estado: estado || actual.estado, 
-        comentario: 'Actualizaciones: ' + cambios.join('; '), 
-        autor: req.user.email 
-      };
-    }
-
-    if (!Object.keys(setOps).length && !Object.keys(pushOps).length) {
-      return res.status(200).json({ mensaje: 'Sin cambios', ticket: actual });
-    }
-
-    const updateOps = {};
-    updateOps.$set = { ...setOps, fecha_actualizacion: new Date(), actualizador: req.user.email };
-    if (pushOps.historial) updateOps.$push = { historial: pushOps.historial };
-    updateOps.$pull = { leidoPor: { usuario: req.user.email } };
-
-    const updated = await Ticket.findOneAndUpdate(
-      { _id: id }, updateOps, { new: true }
-    ).populate('usuario_id', 'email').populate('asignados', 'email nombre');
-
-    if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada tras update' });
-
-    updated.APP_URL = resolveAppUrlFromReq(req);
-    updated.ultimo_autor = req.user.email;
-
-    const destinatarios = await getDestinatariosNotificacion(updated, req.user.email, 'estado');
-    
-    if (destinatarios.length) {
-      try {
-        await enviarCorreoTicket(updated, destinatarios, null, 'estado');
-        console.log('[ESTADO] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
-      } catch (correoError) {
-        console.error('Error al enviar correo de actualizacion:', correoError?.message || correoError);
-      }
-    }
-
-    res.json(updated);
+    res.json(ticket);
   } catch (err) {
-    console.error('Error al actualizar tarea:', err);
-    res.status(500).json({ error: 'Error al actualizar tarea', detalle: err.message });
+    console.error('Error al actualizar estado:', err);
+    res.status(500).json({ error: 'Error al actualizar estado' });
   }
 };
 
@@ -909,42 +730,6 @@ exports.actualizarRecurrencia = async (req, res) => {
     console.error('Error al actualizar recurrencia:', error);
     res.status(500).json({ error: 'Error al actualizar recurrencia', detalle: error.message });
   }
-};
-
-/* ==================== ACTUALIZAR EVENTOS EN CALENDARIOS ==================== */
-exports.actualizarEventosCalendario = async (ticketId, oldDate, newDate) => {
-  try {
-    const ticket = await Ticket.findById(ticketId);
-    if (!ticket) return;
-    const updates = [];
-    if (ticket.google_event_id) {
-      try {
-        const googleCalendarService = require('../services/googleCalendar.service');
-        await googleCalendarService.updateEvent(ticket.usuario_id, ticket.google_event_id, {
-          summary: '[Ticket #' + ticket.numero_ticket + '] ' + ticket.asunto,
-          description: ticket.descripcion,
-          startDateTime: newDate.toISOString(),
-          endDateTime: new Date(newDate.getTime() + 60 * 60 * 1000).toISOString(),
-          timeZone: 'America/Buenos_Aires'
-        });
-        updates.push('Google Calendar');
-      } catch (err) { console.error('Error Google Calendar:', err.message); }
-    }
-    if (ticket.outlook_event_id) {
-      try {
-        const outlookCalendarService = require('../services/outlookCalendar.service');
-        await outlookCalendarService.updateEvent(ticket.usuario_id, ticket.outlook_event_id, {
-          summary: '[Ticket #' + ticket.numero_ticket + '] ' + ticket.asunto,
-          description: ticket.descripcion,
-          startDateTime: newDate.toISOString(),
-          endDateTime: new Date(newDate.getTime() + 60 * 60 * 1000).toISOString(),
-          timeZone: 'America/Buenos_Aires'
-        });
-        updates.push('Outlook Calendar');
-      } catch (err) { console.error('Error Outlook Calendar:', err.message); }
-    }
-    if (updates.length) console.log('Eventos actualizados en ' + updates.join(', ') + ' para ticket ' + ticket.numero_ticket);
-  } catch (err) { console.error('Error actualizando eventos:', err); }
 };
 
 /* ==================== ASIGNACION DE USUARIOS ==================== */

@@ -1,22 +1,24 @@
-const express = require('express');
-const app = express();
+console.log('=== API INDEX ===');
+console.log('Cargando backend/app.js...');
 
-app.use(express.json());
-
-app.get('/health', (req, res) => {
-  res.json({ ok: true, version: '1.0.00', mongodb: 'conectado' });
-});
-
-app.post('/auth/login', (req, res) => {
-  res.json({ ok: true, message: 'Login simulado' });
-});
-
-app.get('/tickets', (req, res) => {
-  res.json({ ok: true, message: 'Ruta tickets funcionando', tickets: [] });
-});
-
-app.get('/tickets/usuarios/disponibles', (req, res) => {
-  res.json({ ok: true, message: 'Usuarios disponibles', usuarios: [] });
-});
-
-module.exports = app;
+try {
+  const app = require('../backend/app.js');
+  console.log('App cargada correctamente');
+  console.log('Tipo de app:', typeof app);
+  console.log('===========================');
+  module.exports = app;
+} catch (err) {
+  console.error('Error cargando app:', err.message);
+  console.error('Stack:', err.stack);
+  
+  const express = require('express');
+  const errorApp = express();
+  errorApp.get('*', (req, res) => {
+    res.status(500).json({ 
+      error: 'Error cargando backend', 
+      message: err.message,
+      stack: err.stack 
+    });
+  });
+  module.exports = errorApp;
+}

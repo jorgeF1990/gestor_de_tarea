@@ -186,8 +186,8 @@ function Home() {
         <div className="home-header">
           <img src="/logo.png" alt="Logo" className="home-logo" />
           <div>
-            <h1 className="home-title">Portfolio Investment</h1>
-            <p className="home-subtitle">Gestor de Tareas</p>
+            <h1 className="home-title">TaskNest</h1>
+            <p className="home-subtitle">Gestión inteligente de tareas</p>
           </div>
         </div>
 

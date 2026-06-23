@@ -104,7 +104,7 @@ export default function Register() {
           <img src="/logo.png" alt="Logo" className="auth-logo" />
           <div>
             <div className="auth-title">Crear cuenta</div>
-            <div className="auth-sub">Portfolio Investment • Sistema de Tickets</div>
+            <div className="auth-sub">TaskNest• Sistema de Tareas</div>
           </div>
         </div>
 

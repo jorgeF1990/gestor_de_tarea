@@ -70,3 +70,4 @@ coverage/
 # =========================
 *.local
 .vercel
+.env*

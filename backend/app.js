@@ -86,7 +86,7 @@ const mongooseOptions = {
   family: 4
 };
 
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
 
 console.log('=== INICIO DEL BACKEND ===');
 console.log('VERCEL:', process.env.VERCEL ? 'SI' : 'NO');

@@ -1,7 +1,11 @@
 // backend/app.js
-// ============================================================
-// CARGA DE VARIABLES DE ENTORNO (compatible con Vercel y local)
-// ============================================================
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const path = require('path');
+const { startScheduler } = require('./scheduler/cron.scheduler.js');
+const User = require('./models/User');
+
 try {
   require('dotenv').config();
   console.log('dotenv cargado correctamente');
@@ -9,36 +13,30 @@ try {
   console.log('dotenv no disponible, usando variables del sistema');
 }
 
-// Dependencias
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-
-// Scheduler
-const { startScheduler } = require('./scheduler/cron.scheduler.js');
-
-// Model usado por la ruta GET /auth/reset/:token (form HTML opcional)
-const User = require('./models/User');
-
-// Rutas
 const authRoutes = require('./routes/auth.routes');
 const ticketRoutes = require('./routes/ticket.routes');
 const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
-/* =========================   CORS   ========================= */
+// ============================================================
+// CORS
+// ============================================================
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim();
 const allowedOrigins = [
   FRONTEND_URL,
   'https://tareasync.vercel.app',
+  'https://tareasync-jorgesfb29-gmailcoms-projects.vercel.app',
+  'https://tareasync-ihtrnbh9f-jorgesfb29-gmailcoms-projects.vercel.app',
   'https://gestor-de-tarea-jorgesfb29-gmailcoms-projects.vercel.app',
   'https://gestor-de-tarea-sepia.vercel.app',
   'https://gestor-de-tarea-axg2mnrvy-jorgesfb29-gmailcoms-projects.vercel.app',
   'http://localhost:3000',
-  'http://localhost:5001'
+  'http://localhost:5001',
+  'http://localhost:5173'
 ].filter(Boolean);
+
+console.log('Orígenes permitidos por CORS:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -46,31 +44,35 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn('Origen no permitido:', origin);
-      // En desarrollo, permitir todos para pruebas
+      console.warn('Origen no permitido por CORS:', origin);
       if (process.env.NODE_ENV === 'development') {
         callback(null, true);
       } else {
-        callback(null, false);
+        callback(new Error('No permitido por CORS'));
       }
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
-/* =========================   Parsers   ========================= */
+app.options('*', cors());
+
+// ============================================================
+// MIDDLEWARES
+// ============================================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-/* =========================   Estaticos (logo y uploads)   ========================= */
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/admin', adminRoutes);
 
-/* =========================   MongoDB - CONEXION ROBUSTA   ========================= */
+// ============================================================
+// MONGODB
+// ============================================================
 const mongooseOptions = {
   serverSelectionTimeoutMS: 10000,
   connectTimeoutMS: 10000,
@@ -95,19 +97,16 @@ let isMongoConnected = false;
 let mongoConnectionPromise = null;
 
 const connectToMongoDB = async () => {
-  if (mongoConnectionPromise) {
-    return mongoConnectionPromise;
-  }
+  if (mongoConnectionPromise) return mongoConnectionPromise;
 
   if (!MONGODB_URI) {
-    console.error('ERROR: No se encontro MONGODB_URI ni MONGO_URI en las variables de entorno');
-    console.error('Asegurate de tener configurado el archivo .env o las variables en Vercel');
+    console.error('ERROR: MONGODB_URI no definida');
     return Promise.reject(new Error('MONGODB_URI no definida'));
   }
 
   console.log('Conectando a MongoDB...');
   console.log('Modo:', MONGODB_URI.includes('mongodb+srv') ? 'Atlas (produccion)' : 'Local');
-  
+
   const maskedURI = MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
   console.log('URI:', maskedURI);
 
@@ -116,13 +115,13 @@ const connectToMongoDB = async () => {
       isMongoConnected = true;
       console.log('MongoDB conectado correctamente');
       console.log('Base de datos:', mongoose.connection.name);
-      
+
       if (!process.env.VERCEL) {
         startScheduler();
       } else {
-        console.log('Scheduler desactivado en entorno serverless (Vercel)');
+        console.log('Scheduler desactivado en Vercel');
       }
-      
+
       return mongoose.connection;
     })
     .catch(err => {
@@ -142,15 +141,10 @@ const getMongoStatus = () => ({
 });
 
 const ensureMongoConnection = async (req, res, next) => {
-  console.log('ensureMongoConnection llamado para:', req.method, req.path);
-  console.log('isMongoConnected:', isMongoConnected, 'readyState:', mongoose.connection.readyState);
-  
   try {
     if (!isMongoConnected || mongoose.connection.readyState !== 1) {
-      console.log('MongoDB no conectado, intentando conectar...');
       await connectToMongoDB();
     }
-    console.log('Conexion MongoDB OK, continuando...');
     next();
   } catch (err) {
     console.error('Error asegurando conexion MongoDB:', err.message);
@@ -162,26 +156,21 @@ const ensureMongoConnection = async (req, res, next) => {
   }
 };
 
-/* =========================   REGISTRO DE RUTAS   ========================= */
-console.log('=== REGISTRO DE RUTAS ===');
-console.log('Auth routes registradas en /auth');
-console.log('Ticket routes registradas en /tickets');
-console.log('===========================');
-
-/* =========================   Rutas principales   ========================= */
+// ============================================================
+// RUTAS
+// ============================================================
 app.use('/auth', ensureMongoConnection, authRoutes);
-console.log('Ruta /auth registrada');
-
 app.use('/tickets', ensureMongoConnection, ticketRoutes);
-console.log('Ruta /tickets registrada');
 
-/* =========================   Utilidades   ========================= */
+// ============================================================
+// UTILIDADES
+// ============================================================
 app.get('/', (_req, res) => res.send('Backend funcionando correctamente'));
 
 app.get('/ping-db', async (_req, res) => {
   try {
     const status = getMongoStatus();
-    
+
     if (!status.isConnected) {
       try {
         await connectToMongoDB();
@@ -216,7 +205,7 @@ app.get('/ping-db', async (_req, res) => {
 app.get('/health', async (_req, res) => {
   try {
     const status = getMongoStatus();
-    
+
     if (!status.isConnected) {
       try {
         await connectToMongoDB();
@@ -224,7 +213,7 @@ app.get('/health', async (_req, res) => {
         console.warn('Health check: MongoDB no disponible');
       }
     }
-    
+
     res.json({
       ok: true,
       version: process.env.VITE_VERSION || '1.0.00',
@@ -244,7 +233,7 @@ app.get('/health', async (_req, res) => {
 app.get('/auth/reset/:token', async (req, res) => {
   try {
     const { token } = req.params;
-    
+
     if (!isMongoConnected || mongoose.connection.readyState !== 1) {
       try {
         await connectToMongoDB();
@@ -252,12 +241,12 @@ app.get('/auth/reset/:token', async (req, res) => {
         return res.status(503).send('Servicio de base de datos no disponible');
       }
     }
-    
+
     const usuario = await User.findOne({
       resetToken: token,
       resetTokenExpira: { $gt: Date.now() }
     });
-    
+
     if (!usuario) return res.status(400).send('Token invalido o expirado');
 
     return res.send(`
@@ -293,7 +282,9 @@ app.get('/auth/reset/:token', async (req, res) => {
   }
 });
 
-/* =========================   Manejo de errores global   ========================= */
+// ============================================================
+// MANEJO DE ERRORES
+// ============================================================
 app.use((err, req, res, next) => {
   console.error('Error no manejado:', err.message);
   console.error(err.stack);
@@ -304,7 +295,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-/* =========================   Inicio servidor   ========================= */
+// ============================================================
+// INICIO DEL SERVIDOR
+// ============================================================
 const PORT = process.env.PORT || 5001;
 
 if (!process.env.VERCEL) {
@@ -320,12 +313,6 @@ if (!process.env.VERCEL) {
         console.log('  GET    /tickets/:id/calendar - Descargar ICS');
         console.log('  GET    /ping-db        - Verificar conexion MongoDB');
         console.log('  GET    /health         - Health check');
-        console.log('\nSistema de notificaciones:');
-        console.log('  - 30, 21, 14, 7, 3, 1 dias antes del vencimiento');
-        console.log('  - El mismo dia del vencimiento');
-        console.log('  - Recordatorios post-vencimiento (1, 3, 7, 14, 30 dias)');
-        console.log('  - Notificaciones de asignacion/desasignacion');
-        console.log('  - Notificaciones de comentarios');
         console.log('='.repeat(50) + '\n');
       });
     })
@@ -339,13 +326,5 @@ if (!process.env.VERCEL) {
     console.warn('Conexion inicial a MongoDB fallo:', err.message);
   });
 }
-
-console.log('=== BACKEND APP ===');
-console.log('Rutas registradas:');
-console.log('  /auth');
-console.log('  /tickets');
-console.log('  /health');
-console.log('  /ping-db');
-console.log('===================');
 
 module.exports = app;

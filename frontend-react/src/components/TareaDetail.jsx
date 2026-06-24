@@ -73,8 +73,8 @@ import {
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_BACKEND_URL;
-const BRAND_NAME = 'TaskNest';
-const LOGO_URL = '/logo.png';
+const BRAND_NAME = 'TareaSync';
+const LOGO_URL = '/logo.svg';
 
 export default function TareaDetail() {
   const { id } = useParams();

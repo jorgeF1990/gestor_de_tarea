@@ -101,7 +101,7 @@ export default function Register() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-head">
-          <img src="/logo.png" alt="Logo" className="auth-logo" />
+          <img src="/logo.svg" alt="Logo" className="auth-logo" />
           <div>
             <div className="auth-title">Crear cuenta</div>
             <div className="auth-sub">TaskNest• Sistema de Tareas</div>

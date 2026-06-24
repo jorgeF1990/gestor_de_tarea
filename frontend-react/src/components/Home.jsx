@@ -184,9 +184,9 @@ function Home() {
     <div className="home">
       <div className="home-card">
         <div className="home-header">
-          <img src="/logo.png" alt="Logo" className="home-logo" />
+          <img src="/logo.svg" alt="Logo" className="home-logo" />
           <div>
-            <h1 className="home-title">TaskNest</h1>
+            <h1 className="home-title">TareaSync</h1>
             <p className="home-subtitle">Gestión inteligente de tareas</p>
           </div>
         </div>

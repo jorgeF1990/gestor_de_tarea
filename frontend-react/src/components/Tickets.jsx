@@ -754,7 +754,7 @@ export default function Tickets() {
                   </span>
                   <div style={{ marginTop: 6 }}>
                     <a href={current.imagen} target="_blank" rel="noreferrer">
-                      <img src={current.imagen || '/logo.png'} alt="Adjunto" width="200" style={{ border: '1px solid var(--border)', borderRadius: 12 }} />
+                      <img src={current.imagen || '/logo.svg'} alt="Adjunto" width="200" style={{ border: '1px solid var(--border)', borderRadius: 12 }} />
                     </a>
                   </div>
                 </div>
@@ -813,7 +813,7 @@ export default function Tickets() {
                       {h.imagen && (
                         <div style={{ marginTop: 6 }}>
                           <a href={h.imagen} target="_blank" rel="noreferrer">
-                            <img src={h.imagen || '/logo.png'} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
+                            <img src={h.imagen || '/logo.svg'} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
                           </a>
                         </div>
                       )}

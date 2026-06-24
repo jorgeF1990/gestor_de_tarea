@@ -4,13 +4,13 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import "./Sidebar.css";
 
-const URL_MATCHFIN =
-  import.meta.env.VITE_URL_MATCHFIN ||
-  "https://app.matchfin.ar/login";
+//const URL_MATCHFIN =
+//  import.meta.env.VITE_URL_MATCHFIN ||
+//  "https://app.matchfin.ar/login";
 
-const URL_AUNESA =
-  import.meta.env.VITE_URL_AUNESA ||
-  "https://portfolioinvestment.aunesa.com/Irmo/";
+//const URL_AUNESA =
+//  import.meta.env.VITE_URL_AUNESA ||
+//  "https://portfolioinvestment.aunesa.com/Irmo/";
 
 export default function Sidebar({ open, onToggle }) {
   const { user, logout } = useContext(AuthContext);
@@ -29,9 +29,9 @@ export default function Sidebar({ open, onToggle }) {
     <aside className={`sidebar ${open ? "sidebar--open" : "sidebar--closed"}`}>
       <div className="sidebar-header">
         <Link to="/" className="sidebar-brand" onClick={maybeClose}>
-          <img src="/logo.png" alt="Logo" className="sidebar-logo" />
+          <img src="/favicon.svg" alt="Logo" className="sidebar-logo" />
           <div className="sidebar-brandtext">
-            <div className="sidebar-title">TaskNest</div>
+            <div className="sidebar-title">TareaSync</div>
             <div className="sidebar-sub">Mesa de ayuda</div>
           </div>
         </Link>

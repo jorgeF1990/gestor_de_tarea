@@ -86,10 +86,10 @@ function Login() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-head">
-          <img src="/logo.png" alt="Logo" className="auth-logo" />
+          <img src="/logo.svg" alt="Logo" className="auth-logo" />
           <div>
             <div className="auth-title">Ingresar</div>
-            <div className="auth-sub">TaskNest• Sistema de Tareas</div>
+            <div className="auth-sub">TareaSync • Sistema de Tareas</div>
           </div>
         </div>
 

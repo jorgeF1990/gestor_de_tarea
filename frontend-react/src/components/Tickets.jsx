@@ -1,13 +1,12 @@
 // frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import axios from 'axios';
+import API from '../api';  // Usar el API con interceptor
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
 import CalendarView from './CalendarView';
 import AsignarUsuarios from './AsignarUsuarios';
 
-
-// Importar iconos profesionales de Lucide React
+// Importar iconos
 import {
   Search,
   RefreshCw,
@@ -61,13 +60,9 @@ import {
   KanbanSquare
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_BACKEND_URL;
-const headers = (token) => ({ Authorization: `Bearer ${token}` });
-
 const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado', 'archivado'];
 const prioOps = ['baja', 'media', 'alta'];
 
-/** Ultima actividad (ms) de un ticket */
 const getActivityTs = (t) => {
   const created = t.createdAt || t.fecha_creacion;
   const updated = t.updatedAt || t.fecha_actualizacion;
@@ -84,7 +79,6 @@ const getActivityTs = (t) => {
   return Math.max(...times.filter(Boolean)) || 0;
 };
 
-/** ISO del ultimo movimiento relevante (comentario/actualizacion) */
 const lastISOFromTicket = (t) => {
   const last = t.historial?.[t.historial.length - 1];
   if (last?.fecha) return new Date(last.fecha).toISOString();
@@ -92,7 +86,6 @@ const lastISOFromTicket = (t) => {
   return null;
 };
 
-/** Formatear fecha con hora */
 const formatearFechaHora = (fecha) => {
   if (!fecha) return '—';
   return new Date(fecha).toLocaleString('es-AR', {
@@ -121,30 +114,22 @@ export default function Tickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // filtros
   const [q, setQ] = useState('');
   const [fEstado, setFEstado] = useState('');
   const [fPrio, setFPrio] = useState('');
 
-  // sort -> por defecto: "actividad" desc
   const [sort, setSort] = useState({ by: 'actividad', dir: 'desc' });
 
-  // paginado
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-  // drawer
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
 
-  // comentario (solo comentar, sin cambiar estado/prioridad)
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ comentario: '', archivo: null });
 
-  // tema (CLARO por defecto)
   const [theme, setTheme] = useState(() => localStorage.getItem('tickets-theme') || 'light');
-
-  // NUEVO: Modo de vista (lista o calendario)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('tickets-view-mode') || 'lista');
 
   useEffect(() => {
@@ -156,11 +141,6 @@ export default function Tickets() {
     localStorage.setItem('tickets-view-mode', viewMode);
   }, [viewMode]);
 
-  const token = localStorage.getItem('token');
-
-  /* ======================
-     Novedades (polling + diff por ticket)
-     ====================== */
   const [newsCount, setNewsCount] = useState(0);
   const [changesMap, setChangesMap] = useState({});
   const [toasts, setToasts] = useState([]);
@@ -229,10 +209,8 @@ export default function Tickets() {
       if (fEstado) params.append('estado', fEstado);
       if (fPrio) params.append('prioridad', fPrio);
 
-      const { data } = await axios.get(`${API}/tickets?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false,
-      });
+      // Usar API con interceptor
+      const { data } = await API.get(`/tickets?${params.toString()}`);
 
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
@@ -270,7 +248,15 @@ export default function Tickets() {
     }
   };
 
-  useEffect(() => { cargar(); }, [fEstado, fPrio]);
+  // Verificar token al montar
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+    cargar();
+  }, [fEstado, fPrio]);
 
   useEffect(() => {
     const id = setInterval(() => cargar(true), 20000);
@@ -304,9 +290,6 @@ export default function Tickets() {
     setSeen(nextSnap);
   };
 
-  /* ======================
-     Busqueda / orden / paginado (MEJORADO)
-     ====================== */
   const filtered = useMemo(() => {
     const textoBusqueda = q.trim().toLowerCase();
 
@@ -381,9 +364,6 @@ export default function Tickets() {
     setSort(s => s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: 'asc' });
   };
 
-  /* ======================
-     Drawer / acciones (solo comentar)
-     ====================== */
   const abrirDrawer = (t) => {
     markAsSeenLocal(t);
     markRead(t._id);
@@ -413,9 +393,10 @@ export default function Tickets() {
       const fd = new FormData();
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
-      await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { 
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false,
+      
+      // Usar API con interceptor
+      await API.put(`/tickets/${current._id}/comentario`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       await cargar();
@@ -435,10 +416,7 @@ export default function Tickets() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      await axios.put(`${API}/tickets/${id}/leido`, {}, { 
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false,
-      });
+      await API.put(`/tickets/${id}/leido`, {});
     } catch (e) {
       console.error('Error marcando como leido:', e);
     }
@@ -450,16 +428,12 @@ export default function Tickets() {
     return new Date(ticket.fecha_vencimiento) < new Date();
   };
 
-  // ===== FUNCION PARA ARCHIVAR/RESTAURAR =====
   const handleArchivar = async (id, archivar = true) => {
     const token = localStorage.getItem('token');
     const nuevoEstado = archivar ? 'archivado' : 'pendiente';
     
     try {
-      await axios.put(`${API}/tickets/${id}/estado`, 
-        { estado: nuevoEstado }, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await API.put(`/tickets/${id}/estado`, { estado: nuevoEstado });
       await cargar();
       cerrarDrawer();
       showToast(archivar ? 'Tarea archivada correctamente' : 'Tarea restaurada correctamente');
@@ -468,6 +442,27 @@ export default function Tickets() {
       showToast('Error al procesar la tarea', 'error');
     }
   };
+
+  // Verificar token al inicio
+  if (!localStorage.getItem('token')) {
+    return (
+      <div className="tks-wrap">
+        <div className="tks-card">
+          <div className="empty">
+            <Lock size={32} />
+            <h3>No autenticado</h3>
+            <p>Por favor, inicia sesión para ver tus tickets.</p>
+            <button 
+              className="tks-btn" 
+              onClick={() => window.location.href = '/login'}
+            >
+              Ir a login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tks-wrap">
@@ -504,8 +499,8 @@ export default function Tickets() {
               title="Tema"
               aria-label="Tema"
             >
-              <option value="light"> Tema claro</option>
-              <option value="dark"> Tema oscuro</option>
+              <option value="light">Tema claro</option>
+              <option value="dark">Tema oscuro</option>
             </select>
 
             <div className="search-wrapper">
@@ -551,10 +546,10 @@ export default function Tickets() {
 
         {viewMode === 'lista' && (
           <div className="tks-legend">
-            <span className="chip chip-new"> Nuevo</span>
-            <span className="chip chip-comment"> Comentario</span>
-            <span className="chip chip-state"> Estado</span>
-            <span className="chip chip-prio"> Prioridad</span>
+            <span className="chip chip-new">Nuevo</span>
+            <span className="chip chip-comment">Comentario</span>
+            <span className="chip chip-state">Estado</span>
+            <span className="chip chip-prio">Prioridad</span>
           </div>
         )}
 
@@ -589,7 +584,7 @@ export default function Tickets() {
                       <th>Asunto</th>
                       <th onClick={() => toggleSort('estado')} style={{ cursor: 'pointer' }}>Estado</th>
                       <th onClick={() => toggleSort('prioridad')} style={{ cursor: 'pointer' }}>Prioridad</th>
-                      <th onClick={() => toggleSort('fecha_vencimiento')} style={{ cursor: 'pointer' }}> Vence</th>
+                      <th onClick={() => toggleSort('fecha_vencimiento')} style={{ cursor: 'pointer' }}>Vence</th>
                       <th>Usuario</th>
                       <th onClick={() => toggleSort('createdAt')} style={{ cursor: 'pointer' }}>Creado</th>
                     </tr>
@@ -609,10 +604,10 @@ export default function Tickets() {
                           <td style={{ maxWidth: 300 }}>
                             <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span>{t.asunto || 'Sin asunto'}</span>
-                              {ch.nuevo && <span className="chip chip-new"> Nuevo</span>}
-                              {ch.comentario && <span className="chip chip-comment"> Comentario</span>}
-                              {ch.estado && <span className="chip chip-state"> Estado</span>}
-                              {ch.prioridad && <span className="chip chip-prio"> Prioridad</span>}
+                              {ch.nuevo && <span className="chip chip-new">Nuevo</span>}
+                              {ch.comentario && <span className="chip chip-comment">Comentario</span>}
+                              {ch.estado && <span className="chip chip-state">Estado</span>}
+                              {ch.prioridad && <span className="chip chip-prio">Prioridad</span>}
                             </div>
                             <div style={{ color: 'var(--muted)', fontSize: 12 }}>{(t.descripcion || '').slice(0, 90)}</div>
                           </td>
@@ -686,7 +681,6 @@ export default function Tickets() {
           </div>
 
           <div className="drawer-body">
-            {/* Info basica */}
             <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -769,7 +763,6 @@ export default function Tickets() {
               />
             </div>
 
-            {/* Comentario + adjunto */}
             <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
               <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <MessageSquare size={14} /> Agregar comentario
@@ -797,7 +790,6 @@ export default function Tickets() {
               </div>
             </div>
 
-            {/* Timeline */}
             <div className="tks-card" style={{ padding: '12px' }}>
               <div style={{ fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Clock size={14} /> Actividad

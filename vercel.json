@@ -89,13 +89,7 @@
     {
       "source": "/(.*)",
       "destination": "https://tareasync.vercel.app/$1",
-      "statusCode": 301,
-      "headers": [
-        {
-          "key": "Host",
-          "value": "tareasync-jorgesfb29-gmailcoms-projects.vercel.app"
-        }
-      ]
+      "statusCode": 301
     }
   ]
 }

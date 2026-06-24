@@ -4,14 +4,6 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import "./Sidebar.css";
 
-//const URL_MATCHFIN =
-//  import.meta.env.VITE_URL_MATCHFIN ||
-//  "https://app.matchfin.ar/login";
-
-//const URL_AUNESA =
-//  import.meta.env.VITE_URL_AUNESA ||
-//  "https://portfolioinvestment.aunesa.com/Irmo/";
-
 export default function Sidebar({ open, onToggle }) {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -38,7 +30,7 @@ export default function Sidebar({ open, onToggle }) {
       </div>
 
       <nav className="sidebar-nav">
-        {/* === Sección General === */}
+        {/* Seccion General */}
         <div className="sidebar-section">
           <div className="sidebar-section-title">General</div>
 
@@ -66,37 +58,7 @@ export default function Sidebar({ open, onToggle }) {
           )}
         </div>
 
-
-        {/* === Sección Accesos rápidos (igual estilo que las demás) === */}
-        {user && (
-          <div className="sidebar-section">
-            <div className="sidebar-section-title">Accesos rápidos</div>
-
-            <a
-              href={URL_MATCHFIN}
-              className="sidebar-link"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={maybeClose}
-            >
-              <span className="icon"></span>
-              <span className="label">Matchfin</span>
-            </a>
-
-            <a
-              href={URL_AUNESA}
-              className="sidebar-link"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={maybeClose}
-            >
-              <span className="icon"></span>
-              <span className="label">PortfolioInvestment Aunesa</span>
-            </a>
-          </div>
-
-        )}
-        {/* === Sección Cuenta === */}
+        {/* Seccion Cuenta */}
         <div className="sidebar-section">
           <div className="sidebar-section-title">Cuenta</div>
 
@@ -130,8 +92,6 @@ export default function Sidebar({ open, onToggle }) {
             </>
           )}
         </div>
-
-
       </nav>
 
       <div className="sidebar-footer">

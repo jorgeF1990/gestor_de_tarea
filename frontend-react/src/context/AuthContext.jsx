@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import { jwtDecode } from "jwt-decode";
+import { setAuthToken } from "../api"; // Importar la función
 
 export const AuthContext = createContext({
   user: null,
@@ -10,7 +11,6 @@ export const AuthContext = createContext({
 });
 
 function readInitialToken() {
-  // Prioridad: localStorage, luego sessionStorage
   const ls = localStorage.getItem("token");
   if (ls) return ls;
   const ss = sessionStorage.getItem("token");
@@ -31,10 +31,16 @@ export function AuthProvider({ children }) {
     }
   });
 
+  // Sincronizar token con el interceptor de axios
+  useEffect(() => {
+    setAuthToken(token);
+  }, [token]);
+
   // Mantener user en sync con token; auto-logout si expira/cambia
   useEffect(() => {
     if (!token) {
       setUser(null);
+      setAuthToken(null);
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
       return;
@@ -45,6 +51,7 @@ export function AuthProvider({ children }) {
       if (exp && Date.now() >= exp) {
         setUser(null);
         setToken(null);
+        setAuthToken(null);
         localStorage.removeItem("token");
         sessionStorage.removeItem("token");
         return;
@@ -53,6 +60,7 @@ export function AuthProvider({ children }) {
     } catch {
       setUser(null);
       setToken(null);
+      setAuthToken(null);
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
     }
@@ -64,10 +72,9 @@ export function AuthProvider({ children }) {
     return list.includes(user.rol);
   }, [user]);
 
-  // login con control de persistencia
   const login = useCallback(async (newToken, opts = { remember: true }) => {
     setToken(newToken);
-    // Persistencia según remember
+    setAuthToken(newToken);
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
     if (opts.remember) {
@@ -80,6 +87,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
+    setAuthToken(null);
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
   }, []);

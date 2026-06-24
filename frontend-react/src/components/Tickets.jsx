@@ -1,9 +1,11 @@
 // frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import API from '../api';
+import axios from 'axios';
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
 import CalendarView from './CalendarView';
+
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://tareasync.vercel.app';
 
 import {
   Search,
@@ -182,8 +184,14 @@ export default function Tickets() {
       if (fEstado) params.append('estado', fEstado);
       if (fPrio) params.append('prioridad', fPrio);
 
-      const { data } = await API.get(`/tickets?${params.toString()}`);
+      // FORZAR EL TOKEN MANUALMENTE
+      const response = await axios.get(`${API_URL}/tickets?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
+      const data = response.data;
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
       const prev = getSeen();
@@ -337,7 +345,10 @@ export default function Tickets() {
 
   const markRead = async (id) => {
     try {
-      await API.put(`/tickets/${id}/leido`, {});
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/tickets/${id}/leido`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
     } catch (e) {
       console.error('Error marcando como leido:', e);
     }
@@ -373,8 +384,11 @@ export default function Tickets() {
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
 
-      await API.put(`/tickets/${current._id}/comentario`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      await axios.put(`${API_URL}/tickets/${current._id}/comentario`, fd, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
       await cargar();
@@ -397,10 +411,13 @@ export default function Tickets() {
   };
 
   const handleArchivar = async (id, archivar = true) => {
+    const token = localStorage.getItem('token');
     const nuevoEstado = archivar ? 'archivado' : 'pendiente';
     
     try {
-      await API.put(`/tickets/${id}/estado`, { estado: nuevoEstado });
+      await axios.put(`${API_URL}/tickets/${id}/estado`, { estado: nuevoEstado }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       await cargar();
       cerrarDrawer();
       showToast(archivar ? 'Tarea archivada correctamente' : 'Tarea restaurada correctamente');

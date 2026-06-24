@@ -1,13 +1,13 @@
 // src/api.js
 import axios from 'axios';
 
-// FORZAR URL DE PRODUCCION
-// Si estas en localhost, usa localhost:5001
+// Usar variables de entorno para la URL
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-const API_URL = isLocalhost 
-  ? 'http://localhost:5001' 
-  : 'https://gestor-de-tarea-jorgesfb29-gmailcoms-projects.vercel.app';
+// Prioridad: variables de entorno → localhost → URL por defecto
+const API_URL = import.meta.env.VITE_API_URL 
+  || import.meta.env.VITE_BACKEND_URL 
+  || (isLocalhost ? 'http://localhost:5001' : 'https://tareasync.vercel.app');
 
 console.log('API_URL:', API_URL); // Para verificar en consola
 

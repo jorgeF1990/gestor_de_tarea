@@ -1,5 +1,6 @@
 // frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
@@ -86,6 +87,7 @@ const formatearHora = (fecha) => {
 };
 
 export default function Tickets() {
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -174,7 +176,7 @@ export default function Tickets() {
     const token = localStorage.getItem('token');
     if (!token) {
       console.warn('No hay token, redirigiendo a login...');
-      window.location.href = '/login';
+      navigate('/login');
       return;
     }
 
@@ -184,7 +186,6 @@ export default function Tickets() {
       if (fEstado) params.append('estado', fEstado);
       if (fPrio) params.append('prioridad', fPrio);
 
-      // FORZAR EL TOKEN MANUALMENTE
       const response = await axios.get(`${API_URL}/tickets?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -219,7 +220,7 @@ export default function Tickets() {
       console.error('Error cargando tickets:', error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         localStorage.removeItem('token');
-        window.location.href = '/login';
+        navigate('/login');
       }
       setTickets([]);
       setChangesMap({});
@@ -228,10 +229,11 @@ export default function Tickets() {
     }
   };
 
+  // VERIFICAR TOKEN AL MONTAR
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      window.location.href = '/login';
+      navigate('/login');
       return;
     }
     cargar();
@@ -374,7 +376,7 @@ export default function Tickets() {
 
     const token = localStorage.getItem('token');
     if (!token) {
-      window.location.href = '/login';
+      navigate('/login');
       return;
     }
 
@@ -397,7 +399,7 @@ export default function Tickets() {
       console.error('Error guardando comentario:', e);
       if (e.response?.status === 401 || e.response?.status === 403) {
         localStorage.removeItem('token');
-        window.location.href = '/login';
+        navigate('/login');
       }
     } finally {
       setSaving(false);
@@ -427,7 +429,11 @@ export default function Tickets() {
     }
   };
 
-  if (!localStorage.getItem('token')) {
+  // ============================================================
+  // REDIRIGIR SI NO HAY TOKEN
+  // ============================================================
+  const token = localStorage.getItem('token');
+  if (!token) {
     return (
       <div className="tks-wrap">
         <div className="tks-card">
@@ -437,7 +443,7 @@ export default function Tickets() {
             <p>Por favor, inicia sesión para ver tus tickets.</p>
             <button 
               className="tks-btn" 
-              onClick={() => window.location.href = '/login'}
+              onClick={() => navigate('/login')}
             >
               Ir a login
             </button>

@@ -4,23 +4,19 @@ import axios from 'axios';
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
 import CalendarView from './CalendarView';
-import AsignarUsuarios from './AsignarUsuarios';
 
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://tareasync.vercel.app';
 
-// Importar iconos profesionales de Lucide React
 import {
   Search,
-  RefreshCw, 
+  RefreshCw,
   Bell,
   BellRing,
   Clock,
   Calendar,
   CalendarDays,
   CalendarClock,
-  AlertCircle,
-  CheckCircle,
   Flag,
-  TrendingUp,
   User,
   MessageSquare,
   Image,
@@ -29,44 +25,19 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
-  Sun,
-  Moon,
   Loader2,
   Inbox,
   Ticket,
   Activity,
-  Eye,
-  EyeOff,
   Lock,
-  FolderOpen,
   Archive,
-  Save,
-  Upload,
-  FileText,
-  Tag,
-  Info,
-  Settings,
-  LogOut,
-  Home,
-  LayoutDashboard,
-  BarChart3,
-  Package,
-  Layers,
-  GripVertical,
-  Plus,
-  Minus,
-  Filter,
-  LayoutList,
-  KanbanSquare
+  ArchiveRestore,
+  LayoutList
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_BACKEND_URL;
-const headers = (token) => ({ Authorization: `Bearer ${token}` });
-
-const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado'];
+const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado', 'archivado'];
 const prioOps = ['baja', 'media', 'alta'];
 
-/** Ultima actividad (ms) de un ticket */
 const getActivityTs = (t) => {
   const created = t.createdAt || t.fecha_creacion;
   const updated = t.updatedAt || t.fecha_actualizacion;
@@ -83,7 +54,6 @@ const getActivityTs = (t) => {
   return Math.max(...times.filter(Boolean)) || 0;
 };
 
-/** ISO del ultimo movimiento relevante (comentario/actualizacion) */
 const lastISOFromTicket = (t) => {
   const last = t.historial?.[t.historial.length - 1];
   if (last?.fecha) return new Date(last.fecha).toISOString();
@@ -91,7 +61,6 @@ const lastISOFromTicket = (t) => {
   return null;
 };
 
-/** Formatear fecha con hora */
 const formatearFechaHora = (fecha) => {
   if (!fecha) return '—';
   return new Date(fecha).toLocaleString('es-AR', {
@@ -120,30 +89,22 @@ export default function Tickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // filtros
   const [q, setQ] = useState('');
   const [fEstado, setFEstado] = useState('');
   const [fPrio, setFPrio] = useState('');
 
-  // sort -> por defecto: "actividad" desc
   const [sort, setSort] = useState({ by: 'actividad', dir: 'desc' });
 
-  // paginado
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-  // drawer
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
 
-  // comentario (solo comentar, sin cambiar estado/prioridad)
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ comentario: '', archivo: null });
 
-  // tema (CLARO por defecto)
   const [theme, setTheme] = useState(() => localStorage.getItem('tickets-theme') || 'light');
-
-  // NUEVO: Modo de vista (lista o calendario)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('tickets-view-mode') || 'lista');
 
   useEffect(() => {
@@ -155,11 +116,6 @@ export default function Tickets() {
     localStorage.setItem('tickets-view-mode', viewMode);
   }, [viewMode]);
 
-  const token = localStorage.getItem('token');
-
-  /* ======================
-     Novedades (polling + diff por ticket)
-     ====================== */
   const [newsCount, setNewsCount] = useState(0);
   const [changesMap, setChangesMap] = useState({});
   const [toasts, setToasts] = useState([]);
@@ -228,12 +184,14 @@ export default function Tickets() {
       if (fEstado) params.append('estado', fEstado);
       if (fPrio) params.append('prioridad', fPrio);
 
-      const { data } = await axios.get(`${API}/tickets?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false, // ← Agregar esta línea
+      // FORZAR EL TOKEN MANUALMENTE
+      const response = await axios.get(`${API_URL}/tickets?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
 
-      // ORDENAR POR ACTIVIDAD (mas reciente primero)
+      const data = response.data;
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
       const prev = getSeen();
@@ -260,7 +218,6 @@ export default function Tickets() {
     } catch (error) {
       console.error('Error cargando tickets:', error);
       if (error.response?.status === 401 || error.response?.status === 403) {
-        // Token invalido o expirado
         localStorage.removeItem('token');
         window.location.href = '/login';
       }
@@ -271,7 +228,14 @@ export default function Tickets() {
     }
   };
 
-  useEffect(() => { cargar(); }, [fEstado, fPrio]);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+    cargar();
+  }, [fEstado, fPrio]);
 
   useEffect(() => {
     const id = setInterval(() => cargar(true), 20000);
@@ -305,13 +269,9 @@ export default function Tickets() {
     setSeen(nextSnap);
   };
 
-  /* ======================
-     Busqueda / orden / paginado (MEJORADO)
-     ====================== */
   const filtered = useMemo(() => {
     const textoBusqueda = q.trim().toLowerCase();
 
-    // Obtener rol del usuario desde el token
     const userRol = (() => {
       try {
         const token = localStorage.getItem('token');
@@ -323,14 +283,11 @@ export default function Tickets() {
       return 'usuario';
     })();
 
-    // PARTIR del array original que ya viene ordenado por actividad
     let arr;
 
     if (!textoBusqueda) {
-      // Sin busqueda: usar el array tal cual (ya ordenado por getActivityTs desc)
       arr = [...tickets];
     } else {
-      // Con busqueda: filtrar MANTENIENDO el orden original
       arr = tickets.filter(t => {
         const numeroTicket = (t.numero_ticket || '').toString().toLowerCase();
         const asunto = (t.asunto || '').toLowerCase();
@@ -344,12 +301,10 @@ export default function Tickets() {
       });
     }
 
-    // ========== EXCLUIR TAREAS ARCHIVADAS PARA USUARIOS NO-ADMIN ==========
     if (userRol !== 'admin' && userRol !== 'soporte') {
-      arr = arr.filter(t => t.estado !== 'archivada');
+      arr = arr.filter(t => t.estado !== 'archivado');
     }
 
-    // SOLO reordenar si el usuario eligio otro criterio de ordenamiento
     if (sort.by !== 'actividad') {
       const dir = sort.dir === 'asc' ? 1 : -1;
 
@@ -388,9 +343,17 @@ export default function Tickets() {
     setSort(s => s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: 'asc' });
   };
 
-  /* ======================
-     Drawer / acciones (solo comentar)
-     ====================== */
+  const markRead = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/tickets/${id}/leido`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      console.error('Error marcando como leido:', e);
+    }
+  };
+
   const abrirDrawer = (t) => {
     markAsSeenLocal(t);
     markRead(t._id);
@@ -420,10 +383,12 @@ export default function Tickets() {
       const fd = new FormData();
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
-      // En guardarComentario
-      await axios.put(`${API}/tickets/${current._id}/comentario`, fd, { 
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false, // ← Agregar esta línea
+
+      await axios.put(`${API_URL}/tickets/${current._id}/comentario`, fd, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
       await cargar();
@@ -439,25 +404,48 @@ export default function Tickets() {
     }
   };
 
-  const markRead = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      // En markRead
-      await axios.put(`${API}/tickets/${id}/leido`, {}, { 
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: false, // ← Agregar esta línea
-      });
-    } catch (e) {
-      console.error('Error marcando como leido:', e);
-    }
-  };
-
   const isVencida = (ticket) => {
     if (!ticket.fecha_vencimiento) return false;
     if (ticket.estado === 'cerrado' || ticket.estado === 'resuelto') return false;
     return new Date(ticket.fecha_vencimiento) < new Date();
   };
+
+  const handleArchivar = async (id, archivar = true) => {
+    const token = localStorage.getItem('token');
+    const nuevoEstado = archivar ? 'archivado' : 'pendiente';
+    
+    try {
+      await axios.put(`${API_URL}/tickets/${id}/estado`, { estado: nuevoEstado }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await cargar();
+      cerrarDrawer();
+      showToast(archivar ? 'Tarea archivada correctamente' : 'Tarea restaurada correctamente');
+    } catch (e) {
+      console.error('Error al archivar/restaurar:', e);
+      showToast('Error al procesar la tarea');
+    }
+  };
+
+  if (!localStorage.getItem('token')) {
+    return (
+      <div className="tks-wrap">
+        <div className="tks-card">
+          <div className="empty">
+            <Lock size={32} />
+            <h3>No autenticado</h3>
+            <p>Por favor, inicia sesión para ver tus tickets.</p>
+            <button 
+              className="tks-btn" 
+              onClick={() => window.location.href = '/login'}
+            >
+              Ir a login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tks-wrap">
@@ -468,7 +456,6 @@ export default function Tickets() {
               <Ticket size={20} style={{ display: 'inline', marginRight: 8 }} />
               Tareas
             </h2>
-            {/* Selector de vista */}
             <div className="tks-view-selector">
               <button
                 className={`tks-view-btn ${viewMode === 'lista' ? 'active' : ''}`}
@@ -495,8 +482,8 @@ export default function Tickets() {
               title="Tema"
               aria-label="Tema"
             >
-              <option value="light"> Tema claro</option>
-              <option value="dark"> Tema oscuro</option>
+              <option value="light">Tema claro</option>
+              <option value="dark">Tema oscuro</option>
             </select>
 
             <div className="search-wrapper">
@@ -540,13 +527,12 @@ export default function Tickets() {
           </div>
         </div>
 
-        {/* Leyenda de chips (solo en vista lista) */}
         {viewMode === 'lista' && (
           <div className="tks-legend">
-            <span className="chip chip-new"> Nuevo</span>
-            <span className="chip chip-comment"> Comentario</span>
-            <span className="chip chip-state"> Estado</span>
-            <span className="chip chip-prio"> Prioridad</span>
+            <span className="chip chip-new">Nuevo</span>
+            <span className="chip chip-comment">Comentario</span>
+            <span className="chip chip-state">Estado</span>
+            <span className="chip chip-prio">Prioridad</span>
           </div>
         )}
 
@@ -554,14 +540,12 @@ export default function Tickets() {
           <div className="empty"><Loader2 size={24} className="spin" /> Cargando…</div>
         )}
 
-        {/* VISTA CALENDARIO */}
         {viewMode === 'calendario' && (
           <div className="tks-calendar-wrapper">
             <CalendarView tickets={filtered} />
           </div>
         )}
 
-        {/* VISTA LISTA */}
         {viewMode === 'lista' && (
           <>
             {!loading && filtered.length === 0 && (
@@ -583,7 +567,7 @@ export default function Tickets() {
                       <th>Asunto</th>
                       <th onClick={() => toggleSort('estado')} style={{ cursor: 'pointer' }}>Estado</th>
                       <th onClick={() => toggleSort('prioridad')} style={{ cursor: 'pointer' }}>Prioridad</th>
-                      <th onClick={() => toggleSort('fecha_vencimiento')} style={{ cursor: 'pointer' }}> Vence</th>
+                      <th onClick={() => toggleSort('fecha_vencimiento')} style={{ cursor: 'pointer' }}>Vence</th>
                       <th>Usuario</th>
                       <th onClick={() => toggleSort('createdAt')} style={{ cursor: 'pointer' }}>Creado</th>
                     </tr>
@@ -603,10 +587,10 @@ export default function Tickets() {
                           <td style={{ maxWidth: 300 }}>
                             <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span>{t.asunto || 'Sin asunto'}</span>
-                              {ch.nuevo && <span className="chip chip-new"> Nuevo</span>}
-                              {ch.comentario && <span className="chip chip-comment"> Comentario</span>}
-                              {ch.estado && <span className="chip chip-state"> Estado</span>}
-                              {ch.prioridad && <span className="chip chip-prio"> Prioridad</span>}
+                              {ch.nuevo && <span className="chip chip-new">Nuevo</span>}
+                              {ch.comentario && <span className="chip chip-comment">Comentario</span>}
+                              {ch.estado && <span className="chip chip-state">Estado</span>}
+                              {ch.prioridad && <span className="chip chip-prio">Prioridad</span>}
                             </div>
                             <div style={{ color: 'var(--muted)', fontSize: 12 }}>{(t.descripcion || '').slice(0, 90)}</div>
                           </td>
@@ -661,7 +645,6 @@ export default function Tickets() {
         )}
       </div>
 
-      {/* Drawer detalle */}
       {open && <div className="backdrop" onClick={cerrarDrawer} />}
       {open && current && (
         <aside className="drawer" role="dialog" aria-modal="true">
@@ -680,7 +663,6 @@ export default function Tickets() {
           </div>
 
           <div className="drawer-body">
-            {/* Info basica */}
             <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -722,7 +704,6 @@ export default function Tickets() {
                   </div>
                   <div>{current.usuario_id?.email || '—'}</div>
                 </div>
-                {/* Info de recurrencia */}
                 {current.es_recurrente && current.recurrencia && (
                   <div>
                     <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
@@ -749,7 +730,7 @@ export default function Tickets() {
                   </span>
                   <div style={{ marginTop: 6 }}>
                     <a href={current.imagen} target="_blank" rel="noreferrer">
-                      <img src={current.imagen || '/logo.png'} alt="Adjunto" width="200" style={{ border: '1px solid var(--border)', borderRadius: 12 }} />
+                      <img src={current.imagen || '/logo.svg'} alt="Adjunto" width="200" style={{ border: '1px solid var(--border)', borderRadius: 12 }} />
                     </a>
                   </div>
                 </div>
@@ -764,7 +745,6 @@ export default function Tickets() {
               />
             </div>
 
-            {/* Comentario + adjunto */}
             <div className="tks-card" style={{ padding: '12px', marginBottom: '12px' }}>
               <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <MessageSquare size={14} /> Agregar comentario
@@ -792,7 +772,6 @@ export default function Tickets() {
               </div>
             </div>
 
-            {/* Timeline */}
             <div className="tks-card" style={{ padding: '12px' }}>
               <div style={{ fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Clock size={14} /> Actividad
@@ -808,7 +787,7 @@ export default function Tickets() {
                       {h.imagen && (
                         <div style={{ marginTop: 6 }}>
                           <a href={h.imagen} target="_blank" rel="noreferrer">
-                            <img src={h.imagen || '/logo.png'} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
+                            <img src={h.imagen || '/logo.svg'} alt="Adjunto" width="150" style={{ border: '1px solid var(--border)', borderRadius: 8 }} />
                           </a>
                         </div>
                       )}
@@ -822,18 +801,36 @@ export default function Tickets() {
           </div>
 
           <div className="drawer-foot">
-            <button className="tks-btn ghost" onClick={cerrarDrawer}>
-              <X size={14} /> Cancelar
-            </button>
-            <button className="tks-btn" onClick={guardarComentario} disabled={saving}>
-              {saving ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
-              {saving ? 'Guardando...' : 'Guardar comentario'}
-            </button>
+            <div className="drawer-actions-left">
+              {current.estado !== 'archivado' ? (
+                <button 
+                  className="tks-btn danger" 
+                  onClick={() => handleArchivar(current._id, true)}
+                >
+                  <Archive size={14} /> Archivar
+                </button>
+              ) : (
+                <button 
+                  className="tks-btn" 
+                  onClick={() => handleArchivar(current._id, false)}
+                >
+                  <ArchiveRestore size={14} /> Restaurar
+                </button>
+              )}
+            </div>
+            <div className="drawer-actions-right">
+              <button className="tks-btn ghost" onClick={cerrarDrawer}>
+                <X size={14} /> Cancelar
+              </button>
+              <button className="tks-btn" onClick={guardarComentario} disabled={saving}>
+                {saving ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                {saving ? 'Guardando...' : 'Guardar comentario'}
+              </button>
+            </div>
           </div>
         </aside>
       )}
 
-      {/* Toasts de novedades */}
       <div className="toast-wrap">
         {toasts.map(t => (
           <div key={t.id} className="toast info">

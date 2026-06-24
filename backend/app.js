@@ -1,3 +1,11 @@
+// ============================================================
+// FORZAR MONGODB_URI - HARDCODEADO
+// ============================================================
+process.env.MONGODB_URI = "mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster";
+process.env.MONGO_URI = process.env.MONGODB_URI;
+console.log("MONGODB_URI FORZADA EN app.js");
+// ============================================================
+
 // backend/app.js
 const express = require('express');
 const mongoose = require('mongoose');

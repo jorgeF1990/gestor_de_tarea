@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.js",
+      "src": "backend/app.js",
       "use": "@vercel/node"
     },
     {
@@ -12,84 +12,8 @@
   ],
   "routes": [
     {
-      "src": "/health",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/ping-db",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/auth/(.*)",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/tickets",
-      "dest": "api/index.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    },
-    {
-      "src": "/tickets/(.*)",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/admin/(.*)",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/calendar/(.*)",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "api/index.js"
-    },
-    {
-      "src": "/",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/login",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/register",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/tickets",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/dashboard",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/stats",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/recuperar",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/reset/(.*)",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/tareas/(.*)",
-      "dest": "frontend-react/dist/index.html"
-    },
-    {
       "src": "/(.*)",
-      "dest": "frontend-react/dist/$1"
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "destination": "https://tareasync.vercel.app/$1",
-      "statusCode": 301
+      "dest": "backend/app.js"
     }
   ]
 }

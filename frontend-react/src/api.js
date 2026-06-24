@@ -14,53 +14,34 @@ const API = axios.create({
   withCredentials: true
 });
 
-let authToken = null;
-
-export const setAuthToken = (token) => {
-  console.log('setAuthToken llamado:', token ? 'Token recibido' : 'Token null');
-  authToken = token;
-};
-
+// ============================================
+// INTERCEPTOR - SIEMPRE USAR localStorage
+// ============================================
 API.interceptors.request.use(
   (config) => {
-    console.log('Interceptor request - URL:', config.url);
-    console.log('Interceptor request - authToken:', authToken ? 'Existe' : 'No existe');
+    // Siempre leer de localStorage directamente
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    console.log('Interceptor - URL:', config.url);
+    console.log('Interceptor - Token existe:', !!token);
     
-    if (authToken) {
-      config.headers.Authorization = `Bearer ${authToken}`;
-      console.log('Interceptor request - Token agregado desde authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('Interceptor - Token agregado');
     } else {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      console.log('Interceptor request - token de localStorage:', token ? 'Existe' : 'No existe');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log('Interceptor request - Token agregado desde localStorage');
-      } else {
-        console.warn('Interceptor request - No hay token disponible');
-      }
+      console.warn('Interceptor - No hay token');
     }
-    
-    console.log('Interceptor request - Headers finales:', config.headers);
     return config;
   },
-  (error) => {
-    console.error('Interceptor request error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 API.interceptors.response.use(
-  (response) => {
-    console.log('Interceptor response - Status:', response.status);
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('Interceptor response error:', error.response?.status, error.response?.data);
+    console.error('API Error:', error.response?.status, error.response?.data);
     if (error.response?.status === 401) {
-      console.warn('Error 401 - Token inválido o expirado');
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
-      authToken = null;
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
@@ -68,10 +49,6 @@ API.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-if (import.meta.env.DEV && !API_URL) {
-  API.defaults.baseURL = 'http://localhost:5001';
-}
 
 const handle = (p) => p.then(res => res.data).catch(err => {
   if (err?.response?.data) throw err.response.data;

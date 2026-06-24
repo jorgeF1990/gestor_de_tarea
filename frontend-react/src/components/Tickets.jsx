@@ -1,12 +1,10 @@
 // frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import API from '../api';  // Usar el API con interceptor
+import API from '../api';
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
 import CalendarView from './CalendarView';
-import AsignarUsuarios from './AsignarUsuarios';
 
-// Importar iconos
 import {
   Search,
   RefreshCw,
@@ -16,10 +14,7 @@ import {
   Calendar,
   CalendarDays,
   CalendarClock,
-  AlertCircle,
-  CheckCircle,
   Flag,
-  TrendingUp,
   User,
   MessageSquare,
   Image,
@@ -28,36 +23,14 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
-  Sun,
-  Moon,
   Loader2,
   Inbox,
   Ticket,
   Activity,
-  Eye,
-  EyeOff,
   Lock,
-  FolderOpen,
   Archive,
   ArchiveRestore,
-  Save,
-  Upload,
-  FileText,
-  Tag,
-  Info,
-  Settings,
-  LogOut,
-  Home,
-  LayoutDashboard,
-  BarChart3,
-  Package,
-  Layers,
-  GripVertical,
-  Plus,
-  Minus,
-  Filter,
-  LayoutList,
-  KanbanSquare
+  LayoutList
 } from 'lucide-react';
 
 const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado', 'archivado'];
@@ -209,7 +182,6 @@ export default function Tickets() {
       if (fEstado) params.append('estado', fEstado);
       if (fPrio) params.append('prioridad', fPrio);
 
-      // Usar API con interceptor
       const { data } = await API.get(`/tickets?${params.toString()}`);
 
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
@@ -248,7 +220,6 @@ export default function Tickets() {
     }
   };
 
-  // Verificar token al montar
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -364,6 +335,14 @@ export default function Tickets() {
     setSort(s => s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: 'asc' });
   };
 
+  const markRead = async (id) => {
+    try {
+      await API.put(`/tickets/${id}/leido`, {});
+    } catch (e) {
+      console.error('Error marcando como leido:', e);
+    }
+  };
+
   const abrirDrawer = (t) => {
     markAsSeenLocal(t);
     markRead(t._id);
@@ -393,8 +372,7 @@ export default function Tickets() {
       const fd = new FormData();
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
-      
-      // Usar API con interceptor
+
       await API.put(`/tickets/${current._id}/comentario`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -412,16 +390,6 @@ export default function Tickets() {
     }
   };
 
-  const markRead = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      await API.put(`/tickets/${id}/leido`, {});
-    } catch (e) {
-      console.error('Error marcando como leido:', e);
-    }
-  };
-
   const isVencida = (ticket) => {
     if (!ticket.fecha_vencimiento) return false;
     if (ticket.estado === 'cerrado' || ticket.estado === 'resuelto') return false;
@@ -429,7 +397,6 @@ export default function Tickets() {
   };
 
   const handleArchivar = async (id, archivar = true) => {
-    const token = localStorage.getItem('token');
     const nuevoEstado = archivar ? 'archivado' : 'pendiente';
     
     try {
@@ -439,11 +406,10 @@ export default function Tickets() {
       showToast(archivar ? 'Tarea archivada correctamente' : 'Tarea restaurada correctamente');
     } catch (e) {
       console.error('Error al archivar/restaurar:', e);
-      showToast('Error al procesar la tarea', 'error');
+      showToast('Error al procesar la tarea');
     }
   };
 
-  // Verificar token al inicio
   if (!localStorage.getItem('token')) {
     return (
       <div className="tks-wrap">
@@ -662,7 +628,6 @@ export default function Tickets() {
         )}
       </div>
 
-      {/* Drawer detalle */}
       {open && <div className="backdrop" onClick={cerrarDrawer} />}
       {open && current && (
         <aside className="drawer" role="dialog" aria-modal="true">
@@ -849,7 +814,6 @@ export default function Tickets() {
         </aside>
       )}
 
-      {/* Toasts de novedades */}
       <div className="toast-wrap">
         {toasts.map(t => (
           <div key={t.id} className="toast info">

@@ -1,12 +1,10 @@
 // frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import API from '../api';
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
 import CalendarView from './CalendarView';
-
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://tareasync.vercel.app';
 
 import {
   Search,
@@ -186,13 +184,9 @@ export default function Tickets() {
       if (fEstado) params.append('estado', fEstado);
       if (fPrio) params.append('prioridad', fPrio);
 
-      const response = await axios.get(`${API_URL}/tickets?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await API.get(`/tickets?${params.toString()}`);
 
-      const data = response.data;
+      const data = response;
       const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
 
       const prev = getSeen();
@@ -229,7 +223,6 @@ export default function Tickets() {
     }
   };
 
-  // VERIFICAR TOKEN AL MONTAR
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -347,10 +340,7 @@ export default function Tickets() {
 
   const markRead = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`${API_URL}/tickets/${id}/leido`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await API.put(`/tickets/${id}/leido`, {});
     } catch (e) {
       console.error('Error marcando como leido:', e);
     }
@@ -386,11 +376,8 @@ export default function Tickets() {
       if (form.comentario) fd.append('comentario', form.comentario);
       if (form.archivo) fd.append('imagen', form.archivo);
 
-      await axios.put(`${API_URL}/tickets/${current._id}/comentario`, fd, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
+      await API.put(`/tickets/${current._id}/comentario`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       await cargar();
@@ -413,13 +400,10 @@ export default function Tickets() {
   };
 
   const handleArchivar = async (id, archivar = true) => {
-    const token = localStorage.getItem('token');
     const nuevoEstado = archivar ? 'archivado' : 'pendiente';
     
     try {
-      await axios.put(`${API_URL}/tickets/${id}/estado`, { estado: nuevoEstado }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await API.put(`/tickets/${id}/estado`, { estado: nuevoEstado });
       await cargar();
       cerrarDrawer();
       showToast(archivar ? 'Tarea archivada correctamente' : 'Tarea restaurada correctamente');
@@ -429,11 +413,7 @@ export default function Tickets() {
     }
   };
 
-  // ============================================================
-  // REDIRIGIR SI NO HAY TOKEN
-  // ============================================================
-  const token = localStorage.getItem('token');
-  if (!token) {
+  if (!localStorage.getItem('token')) {
     return (
       <div className="tks-wrap">
         <div className="tks-card">

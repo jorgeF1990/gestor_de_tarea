@@ -1,4 +1,3 @@
-// frontend-react/src/api.js
 import axios from 'axios';
 
 // ============================================
@@ -6,6 +5,7 @@ import axios from 'axios';
 // ============================================
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+// Usar la variable correcta SIN /api al final
 const API_URL = import.meta.env.VITE_API_URL 
   || import.meta.env.VITE_BACKEND_URL 
   || (isLocalhost ? 'http://localhost:5001' : 'https://tareasync.vercel.app');
@@ -25,6 +25,8 @@ API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     console.log('[API] Request:', config.method.toUpperCase(), config.url);
+    console.log('[API] Full URL:', config.baseURL + config.url);
+    console.log('[API] Token exists:', !!token);
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

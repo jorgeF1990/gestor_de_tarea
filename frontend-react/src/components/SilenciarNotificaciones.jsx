@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import API from '../api';
 import './SilenciarNotificaciones.css';
 
-const API = import.meta.env.VITE_BACKEND_URL;
 
 const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
   const [estado, setEstado] = useState({ habilitadas: true, silenciadoHasta: null });
@@ -23,7 +22,7 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
     if (!ticketId) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/tickets/${ticketId}/notificaciones/estado`, {
+      const res = await API.get(`${API}/tickets/${ticketId}/notificaciones/estado`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEstado(res.data);
@@ -43,7 +42,7 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
     setMensaje(null);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(
+      await API.post(
         `${API}/tickets/${ticketId}/silenciar`,
         { dias },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -65,7 +64,7 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
     setMensaje(null);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(
+      await API.post(
         `${API}/tickets/${ticketId}/reanudar`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }

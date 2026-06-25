@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import axios from "axios";
+import API from "../api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -169,7 +169,7 @@ export default function StatsPage({ tickets: propTickets }) {
       setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/tickets`, {
+        const res = await API.get(`${import.meta.env.VITE_BACKEND_URL}/tickets`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (mounted) setTickets(res.data || []);

@@ -1,12 +1,11 @@
 // frontend-react/src/components/Login.jsx
 import React, { useContext, useState } from 'react';
-import axios from 'axios';
+import API from '../api';
 import { jwtDecode } from 'jwt-decode';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import './Auth.css';
 
-const API = import.meta.env.VITE_BACKEND_URL || '';
 
 function Login() {
   const navigate = useNavigate();
@@ -37,7 +36,7 @@ function Login() {
       console.log('Enviando petición a:', `${API}/auth/login`);
       console.log('Email:', emailClean);
       
-      const response = await axios.post(`${API}/auth/login`, 
+      const response = await API.post(`${API}/auth/login`, 
         { email: emailClean, password: passClean },
         { withCredentials: false }
       );

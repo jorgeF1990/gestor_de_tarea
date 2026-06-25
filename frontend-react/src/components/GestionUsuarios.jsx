@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import API from '../api';
 import { 
   Users, 
   Crown, 
@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import './GestionUsuarios.css';
 
-const API = import.meta.env.VITE_BACKEND_URL;
 
 export default function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -38,7 +37,7 @@ export default function GestionUsuarios() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/admin/usuarios`, {
+      const res = await API.get(`${API}/admin/usuarios`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsuarios(res.data);
@@ -59,7 +58,7 @@ export default function GestionUsuarios() {
     setSaving(prev => ({ ...prev, [usuarioId]: true }));
     try {
       const token = localStorage.getItem('token');
-      await axios.put(
+      await API.put(
         `${API}/admin/usuarios/${usuarioId}`,
         datos,
         { headers: { Authorization: `Bearer ${token}` } }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import API from '../api';
 import { 
   UserPlus, 
   UserMinus, 
@@ -14,14 +14,13 @@ import {
 } from 'lucide-react';
 import './AsignarUsuarios.css';
 
-const API = import.meta.env.VITE_BACKEND_URL;
 
 export default function AsignarUsuarios({ 
-  ticketId,           // Si existe, es modo edición
-  selectedUsers = [], // Para modo creación (lista de usuarios preseleccionados)
-  onUsersChange,      // Callback cuando cambian los usuarios (modo creación)
-  onAsignacionCambio, // Callback después de asignar/desasignar (modo edición)
-  soloLectura = false // Si es true, solo muestra los usuarios asignados sin botones
+  ticketId,
+  selectedUsers = [],
+  onUsersChange,
+  onAsignacionCambio,
+  soloLectura = false
 }) {
   const [asignados, setAsignados] = useState([]);
   const [usuariosDisponibles, setUsuariosDisponibles] = useState([]);
@@ -30,7 +29,6 @@ export default function AsignarUsuarios({
   const [mostrarSelector, setMostrarSelector] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   
-  // Determinar si estamos en modo edición
   const isEditMode = !!ticketId;
   const isCreateMode = !ticketId && onUsersChange !== undefined;
   const isViewMode = soloLectura;
@@ -38,10 +36,7 @@ export default function AsignarUsuarios({
   const cargarAsignados = async () => {
     if (!isEditMode) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/tickets/${ticketId}/asignados`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await API.get(`/tickets/${ticketId}/asignados`);
       setAsignados(res.data || []);
     } catch (error) {
       console.error('Error al cargar asignados:', error);
@@ -51,10 +46,7 @@ export default function AsignarUsuarios({
 
   const cargarUsuariosDisponibles = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/tickets/usuarios/disponibles`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await API.get('/tickets/usuarios/disponibles');
       setUsuariosDisponibles(res.data || []);
     } catch (error) {
       console.error('Error al cargar usuarios:', error);
@@ -69,14 +61,12 @@ export default function AsignarUsuarios({
         setCargando(false);
       });
     } else if (isCreateMode) {
-      // En modo creación, solo cargar usuarios disponibles
       cargarUsuariosDisponibles().finally(() => setCargando(false));
     } else {
       setCargando(false);
     }
   }, [ticketId]);
 
-  // En modo creación, los usuarios seleccionados vienen de props
   const getUsuariosActuales = () => {
     if (isEditMode) return asignados;
     if (isCreateMode) return selectedUsers || [];
@@ -92,28 +82,21 @@ export default function AsignarUsuarios({
     setLoading(true);
     
     if (isEditMode) {
-      // Modo edición: llamar al API
       try {
-        const token = localStorage.getItem('token');
-        await axios.post(
-          `${API}/tickets/${ticketId}/asignar`,
-          { usuarioId },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await API.post(`/tickets/${ticketId}/asignar`, { usuarioId });
         await cargarAsignados();
         await cargarUsuariosDisponibles();
         setMostrarSelector(false);
-        setMensaje({ type: 'success', text: `✅ Usuario ${userEmail} asignado correctamente` });
+        setMensaje({ type: 'success', text: `Usuario ${userEmail} asignado correctamente` });
         setTimeout(() => setMensaje(null), 3000);
         if (onAsignacionCambio) onAsignacionCambio();
       } catch (error) {
-        setMensaje({ type: 'error', text: `❌ ${error.response?.data?.error || 'Error al asignar'}` });
+        setMensaje({ type: 'error', text: `${error.response?.data?.error || 'Error al asignar'}` });
         setTimeout(() => setMensaje(null), 3000);
       } finally {
         setLoading(false);
       }
     } else if (isCreateMode) {
-      // Modo creación: solo actualizar estado local
       const usuario = usuariosDisponibles.find(u => u._id === usuarioId);
       if (usuario && !usuariosActuales.some(a => a._id === usuarioId)) {
         onUsersChange([...usuariosActuales, usuario]);
@@ -128,23 +111,19 @@ export default function AsignarUsuarios({
     
     if (isEditMode) {
       try {
-        const token = localStorage.getItem('token');
-        await axios.delete(`${API}/tickets/${ticketId}/asignar/${usuarioId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await API.delete(`/tickets/${ticketId}/asignar/${usuarioId}`);
         await cargarAsignados();
         await cargarUsuariosDisponibles();
-        setMensaje({ type: 'success', text: `✅ Usuario ${userEmail} desasignado` });
+        setMensaje({ type: 'success', text: `Usuario ${userEmail} desasignado` });
         setTimeout(() => setMensaje(null), 3000);
         if (onAsignacionCambio) onAsignacionCambio();
       } catch (error) {
-        setMensaje({ type: 'error', text: `❌ ${error.response?.data?.error || 'Error al desasignar'}` });
+        setMensaje({ type: 'error', text: `${error.response?.data?.error || 'Error al desasignar'}` });
         setTimeout(() => setMensaje(null), 3000);
       } finally {
         setLoading(false);
       }
     } else if (isCreateMode) {
-      // Modo creación: solo actualizar estado local
       onUsersChange(usuariosActuales.filter(u => u._id !== usuarioId));
       setLoading(false);
     }
@@ -183,7 +162,6 @@ export default function AsignarUsuarios({
     );
   }
 
-  // Modo solo lectura
   if (isViewMode) {
     return (
       <div className="asignar-usuarios readonly">

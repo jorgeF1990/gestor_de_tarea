@@ -1,6 +1,6 @@
 import React, { useState, useContext, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import API from "../api";
 import { AuthContext } from "../context/AuthContext";
 import "./Home.css";
 import AsignarUsuarios from "./AsignarUsuarios";
@@ -42,7 +42,6 @@ function Home() {
   const [vencimientoHora, setVencimientoHora] = useState("23:59");
   const [usuariosAsignados, setUsuariosAsignados] = useState([]);
   
-  // ========== RECURRENCIA ==========
   const [recurrenciaConfig, setRecurrenciaConfig] = useState({
     es_recurrente: false,
     recurrencia: null
@@ -132,13 +131,11 @@ function Home() {
     
     if (imagen) formData.append("imagen", imagen);
     
-    // Agregar IDs de usuarios asignados
     if (usuariosAsignados.length > 0) {
       const usuariosIds = usuariosAsignados.map(u => u._id);
       formData.append("usuarios_asignados", JSON.stringify(usuariosIds));
     }
 
-    // ========== AGREGAR DATOS DE RECURRENCIA ==========
     if (recurrenciaConfig.es_recurrente && recurrenciaConfig.recurrencia) {
       const rec = recurrenciaConfig.recurrencia;
       formData.append("es_recurrente", "true");
@@ -161,20 +158,20 @@ function Home() {
 
     try {
       setLoading(true);
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/tickets`, formData, {
+      await API.post('/tickets', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });
-      setMensaje("✅ Tarea creada con éxito");
+      setMensaje("Tarea creada con éxito");
       resetForm();
     } catch (err) {
       const msg =
         err?.response?.data?.error ||
         err?.message ||
         "Ocurrió un error al crear la tarea";
-      setMensaje(`⛔ ${msg}`);
+      setMensaje(`Error: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -213,7 +210,6 @@ function Home() {
               <FileText size={18} /> Crear nueva Tarea
             </h2>
             <form className="home-form" onSubmit={handleSubmit}>
-              {/* Campo Asunto */}
               <div className="form-group">
                 <label htmlFor="asunto">
                   <span className="label-icon">📌</span> Asunto
@@ -236,7 +232,6 @@ function Home() {
                 </div>
               </div>
 
-              {/* Campo Descripción */}
               <div className="form-group">
                 <label htmlFor="descripcion">
                   <FileText size={14} /> Descripción
@@ -259,7 +254,6 @@ function Home() {
                 </div>
               </div>
 
-              {/* Fila de fecha y hora */}
               <div className="form-row">
                 <div className="form-group half">
                   <label htmlFor="fecha_vencimiento">
@@ -300,20 +294,17 @@ function Home() {
                 </div>
               </div>
 
-              {/* ========== CONFIGURACIÓN DE RECURRENCIA ========== */}
               <RecurrenciaConfig 
                 config={recurrenciaConfig}
                 onChange={setRecurrenciaConfig}
                 disabled={loading}
               />
 
-              {/* Selector de usuarios para asignar */}
               <AsignarUsuarios 
                 selectedUsers={usuariosAsignados}
                 onUsersChange={setUsuariosAsignados}
               />
 
-              {/* Campo Adjuntar imagen */}
               <div className="form-group">
                 <label htmlFor="imagen">
                   <ImageIcon size={14} /> Adjuntar imagen (opcional)
@@ -372,7 +363,6 @@ function Home() {
                 </div>
               </div>
 
-              {/* Botón de envío */}
               <div className="form-actions">
                 <button 
                   type="submit" 
@@ -395,24 +385,22 @@ function Home() {
           </>
         )}
 
-        {/* Mensaje de alerta */}
         {mensaje && (
           <div
             className={`home-alert ${
-              mensaje.startsWith("✅") ? "ok" : "err"
+              mensaje.startsWith("Error") ? "err" : "ok"
             }`}
             role="alert"
           >
-            {mensaje.startsWith("✅") ? (
-              <CheckCircle size={16} aria-hidden="true" />
-            ) : (
+            {mensaje.startsWith("Error") ? (
               <AlertCircle size={16} aria-hidden="true" />
+            ) : (
+              <CheckCircle size={16} aria-hidden="true" />
             )}
             {mensaje}
           </div>
         )}
 
-        {/* Footer */}
         <div className="home-footer">
           <span>Versión: {version}</span>
           <span>•</span>

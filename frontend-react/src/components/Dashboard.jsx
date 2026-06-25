@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import axios from 'axios';
+import API from '../api';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
@@ -21,7 +21,6 @@ const SEEN_KEY_ADMIN = 'dashboard_last_seen:v1';
 const OPEN_KEY_ADMIN = 'dashboard_open_cards:v1';
 const THEME_KEY = 'dashboard-theme';
 const VIEW_MODE_KEY = 'dashboard_view_mode:v1';
-const API = import.meta.env.VITE_BACKEND_URL || '';
 
 // Helpers ============================================================
 const getActivityTs = (t) => {
@@ -178,7 +177,7 @@ function Dashboard() {
     if (estadoFiltro) params.append('estado', estadoFiltro);
     if (prioridadFiltro) params.append('prioridad', prioridadFiltro);
     try {
-      const res = await axios.get(`${API}/tickets?${params.toString()}`, {
+      const res = await API.get(`${API}/tickets?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const ordenados = (res.data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
@@ -262,7 +261,7 @@ function Dashboard() {
     }
 
     try {
-      const res = await axios.put(`${API}/tickets/${id}/estado`, payload, {
+      const res = await API.put(`${API}/tickets/${id}/estado`, payload, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
 
@@ -326,7 +325,7 @@ function Dashboard() {
     if (nuevoComentario) formData.append('comentario', nuevoComentario);
     if (nuevoArchivo) formData.append('imagen', nuevoArchivo);
     try {
-      await axios.put(`${API}/tickets/${id}/comentario`, formData, {
+      await API.put(`${API}/tickets/${id}/comentario`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCambios(prev => {

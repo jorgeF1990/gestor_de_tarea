@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import API from '../api';
 import './TareaDetail.css';
 
 // Importar iconos profesionales de Lucide React (mismos que el Dashboard)
@@ -72,7 +72,6 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_BACKEND_URL;
 const BRAND_NAME = 'TareaSync';
 const LOGO_URL = '/logo.svg';
 
@@ -107,7 +106,7 @@ export default function TareaDetail() {
         return;
       }
       
-      const res = await axios.get(`${API}/tickets/${id}`, {
+      const res = await API.get(`${API}/tickets/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -139,7 +138,7 @@ export default function TareaDetail() {
         return;
       }
       
-      await axios.post(
+      await API.post(
         `${API}/tickets/${id}/silenciar`,
         { dias: 30 },
         { headers: { Authorization: `Bearer ${token}` } }

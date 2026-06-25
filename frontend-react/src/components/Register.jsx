@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import axios from 'axios';
+import API from '../api';
 import { jwtDecode } from 'jwt-decode';
 import { Link, useNavigate } from 'react-router-dom';
 import './Auth.css';
 
-const API = import.meta.env.VITE_BACKEND_URL;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -55,14 +54,14 @@ export default function Register() {
       setLoading(true);
 
       // 1) Registrar
-      await axios.post(`${API}/auth/register`, {
+      await API.post(`${API}/auth/register`, {
         nombre: name,      // si tu backend espera "nombre"
         email,
         password: pass
       });
 
       // 2) Auto-login para obtener token
-      const { data } = await axios.post(`${API}/auth/login`, { email, password: pass });
+      const { data } = await API.post(`${API}/auth/login`, { email, password: pass });
       if (!data?.token) {
         setMsg({ type:'err', text:'No se pudo iniciar sesión automáticamente. Ingresá manualmente.' });
         navigate('/login');

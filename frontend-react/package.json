@@ -19,16 +19,16 @@
     "jwt-decode": "^4.0.0",
     "lucide-react": "^1.21.0",
     "multer": "^2.0.2",
-    "react": "^19.2.7",
+    "react": "^18.3.1",
     "react-big-calendar": "^1.19.4",
     "react-chartjs-2": "^5.3.1",
-    "react-dom": "^19.2.7",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^7.9.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
-    "@types/react": "^19.1.16",
-    "@types/react-dom": "^19.1.9",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.36.0",
@@ -38,7 +38,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.15",
     "vite": "^7.1.7"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
-
-  "engines": { "node": "24.x" }

@@ -1,17 +1,14 @@
 // api/index.js - Punto de entrada para Vercel
 console.log('=== API INDEX ===');
 
-// Forzar MONGODB_URI
+// FORZAR MONGODB_URI PARA PRODUCCION
 const MONGODB_URI = 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
-
-// Forzar en process.env
 process.env.MONGODB_URI = MONGODB_URI;
 process.env.MONGO_URI = MONGODB_URI;
 
 console.log('MONGODB_URI forzada en process.env');
 
 try {
-  // Importar app.js
   const app = require('../backend/app.js');
   console.log('App cargada correctamente');
   module.exports = app;

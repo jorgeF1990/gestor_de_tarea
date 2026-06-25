@@ -1,24 +1,24 @@
-// ============================================================
-// FORZAR MONGODB_URI - HARDCODEADO
-// ============================================================
-process.env.MONGODB_URI = "mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster";
-process.env.MONGO_URI = process.env.MONGODB_URI;
-console.log("MONGODB_URI FORZADA EN app.js");
-// ============================================================
-
 // backend/app.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const dotenv = require('dotenv');
 const { startScheduler } = require('./scheduler/cron.scheduler.js');
 const User = require('./models/User');
 
-try {
-  require('dotenv').config();
-  console.log('dotenv cargado correctamente');
-} catch (err) {
-  console.log('dotenv no disponible, usando variables del sistema');
+// ============================================================
+// ENVIRONMENT CONFIGURATION
+// ============================================================
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
+// FORZAR MONGODB_URI PARA PRODUCCION
+if (isProduction) {
+  process.env.MONGODB_URI = 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
+  console.log('[ENV] Production mode - MONGODB_URI forzada');
+} else {
+  dotenv.config({ path: '.env.local' });
+  console.log('[ENV] Development mode');
 }
 
 const authRoutes = require('./routes/auth.routes');
@@ -28,37 +28,39 @@ const adminRoutes = require('./routes/admin.routes');
 const app = express();
 
 // ============================================================
-// CORS
+// CORS CONFIGURATION
 // ============================================================
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim();
-const allowedOrigins = [
-  FRONTEND_URL,
-  'https://tareasync.vercel.app',
-  'https://tareasync-jorgesfb29-gmailcoms-projects.vercel.app',
-  'https://tareasync-ihtrnbh9f-jorgesfb29-gmailcoms-projects.vercel.app',
-  'https://gestor-de-tarea-jorgesfb29-gmailcoms-projects.vercel.app',
-  'https://gestor-de-tarea-sepia.vercel.app',
-  'https://gestor-de-tarea-axg2mnrvy-jorgesfb29-gmailcoms-projects.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5001',
-  'http://localhost:5173'
-].filter(Boolean);
 
-console.log('Orígenes permitidos por CORS:', allowedOrigins);
+const allowedOrigins = isProduction
+  ? [
+      FRONTEND_URL,
+      'https://tareasync.vercel.app',
+      'https://tareasync-jorgesfb29-gmailcoms-projects.vercel.app',
+      'https://tareasync-ihtrnbh9f-jorgesfb29-gmailcoms-projects.vercel.app',
+      'https://gestor-de-tarea-jorgesfb29-gmailcoms-projects.vercel.app',
+      'https://gestor-de-tarea-sepia.vercel.app',
+      'https://gestor-de-tarea-os8w-jorgesfb29-gmailcoms-projects.vercel.app'
+    ]
+  : [
+      'http://localhost:3000',
+      'http://localhost:5001',
+      'http://localhost:5173'
+    ];
+
+console.log('[CORS] Allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn('Origen no permitido por CORS:', origin);
-      if (process.env.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        callback(new Error('No permitido por CORS'));
-      }
+      return callback(null, true);
     }
+    console.warn('[CORS] Blocked origin:', origin);
+    if (!isProduction) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
@@ -79,8 +81,13 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/admin', adminRoutes);
 
 // ============================================================
-// MONGODB
+// MONGODB CONNECTION
 // ============================================================
+const MONGODB_URI = process.env.MONGODB_URI;
+
+console.log('[DB] Environment:', isProduction ? 'Production' : 'Development');
+console.log('[DB] MONGODB_URI:', MONGODB_URI ? 'Defined' : 'Not defined');
+
 const mongooseOptions = {
   serverSelectionTimeoutMS: 10000,
   connectTimeoutMS: 10000,
@@ -94,13 +101,6 @@ const mongooseOptions = {
   family: 4
 };
 
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
-
-console.log('=== INICIO DEL BACKEND ===');
-console.log('VERCEL:', process.env.VERCEL ? 'SI' : 'NO');
-console.log('MONGODB_URI:', MONGODB_URI ? 'DEFINIDA' : 'NO DEFINIDA');
-console.log('===========================');
-
 let isMongoConnected = false;
 let mongoConnectionPromise = null;
 
@@ -108,32 +108,33 @@ const connectToMongoDB = async () => {
   if (mongoConnectionPromise) return mongoConnectionPromise;
 
   if (!MONGODB_URI) {
-    console.error('ERROR: MONGODB_URI no definida');
-    return Promise.reject(new Error('MONGODB_URI no definida'));
+    console.error('[DB] ERROR: MONGODB_URI not defined');
+    return Promise.reject(new Error('MONGODB_URI not defined'));
   }
 
-  console.log('Conectando a MongoDB...');
-  console.log('Modo:', MONGODB_URI.includes('mongodb+srv') ? 'Atlas (produccion)' : 'Local');
+  console.log('[DB] Connecting to MongoDB...');
+  const mode = MONGODB_URI.includes('mongodb+srv') ? 'Atlas (Production)' : 'Local';
+  console.log('[DB] Mode:', mode);
 
   const maskedURI = MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
-  console.log('URI:', maskedURI);
+  console.log('[DB] URI:', maskedURI);
 
   mongoConnectionPromise = mongoose.connect(MONGODB_URI, mongooseOptions)
     .then(() => {
       isMongoConnected = true;
-      console.log('MongoDB conectado correctamente');
-      console.log('Base de datos:', mongoose.connection.name);
+      console.log('[DB] MongoDB connected successfully');
+      console.log('[DB] Database:', mongoose.connection.name);
 
-      if (!process.env.VERCEL) {
+      if (!isProduction) {
         startScheduler();
       } else {
-        console.log('Scheduler desactivado en Vercel');
+        console.log('[DB] Scheduler disabled in Vercel environment');
       }
 
       return mongoose.connection;
     })
     .catch(err => {
-      console.error('Error de conexion a MongoDB:', err.message);
+      console.error('[DB] Connection error:', err.message);
       isMongoConnected = false;
       mongoConnectionPromise = null;
       throw err;
@@ -145,7 +146,7 @@ const connectToMongoDB = async () => {
 const getMongoStatus = () => ({
   readyState: mongoose.connection.readyState,
   isConnected: isMongoConnected && mongoose.connection.readyState === 1,
-  readyStateText: ['desconectado', 'conectado', 'conectando', 'desconectando'][mongoose.connection.readyState] || 'desconocido'
+  readyStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown'
 });
 
 const ensureMongoConnection = async (req, res, next) => {
@@ -155,25 +156,25 @@ const ensureMongoConnection = async (req, res, next) => {
     }
     next();
   } catch (err) {
-    console.error('Error asegurando conexion MongoDB:', err.message);
+    console.error('[DB] Connection assurance error:', err.message);
     res.status(503).json({
       ok: false,
-      error: 'Servicio de base de datos no disponible',
+      error: 'Database service unavailable',
       message: err.message
     });
   }
 };
 
 // ============================================================
-// RUTAS
+// ROUTES
 // ============================================================
 app.use('/auth', ensureMongoConnection, authRoutes);
 app.use('/tickets', ensureMongoConnection, ticketRoutes);
 
 // ============================================================
-// UTILIDADES
+// UTILITY ENDPOINTS
 // ============================================================
-app.get('/', (_req, res) => res.send('Backend funcionando correctamente'));
+app.get('/', (_req, res) => res.send('Backend running correctly'));
 
 app.get('/ping-db', async (_req, res) => {
   try {
@@ -185,7 +186,7 @@ app.get('/ping-db', async (_req, res) => {
       } catch (err) {
         return res.status(503).json({
           ok: false,
-          error: 'No se pudo conectar a MongoDB',
+          error: 'Failed to connect to MongoDB',
           message: err.message,
           readyState: status.readyState,
           readyStateText: status.readyStateText
@@ -196,14 +197,14 @@ app.get('/ping-db', async (_req, res) => {
     await mongoose.connection.db.admin().ping();
     res.json({
       ok: true,
-      message: 'MongoDB responde correctamente',
+      message: 'MongoDB responds correctly',
       ...getMongoStatus()
     });
   } catch (err) {
-    console.error('Error al hacer ping a MongoDB:', err.message);
+    console.error('[DB] Ping error:', err.message);
     res.status(500).json({
       ok: false,
-      error: 'Error al conectar con MongoDB',
+      error: 'Error connecting to MongoDB',
       message: err.message,
       ...getMongoStatus()
     });
@@ -218,21 +219,21 @@ app.get('/health', async (_req, res) => {
       try {
         await connectToMongoDB();
       } catch (err) {
-        console.warn('Health check: MongoDB no disponible');
+        console.warn('[HEALTH] MongoDB unavailable');
       }
     }
 
     res.json({
       ok: true,
       version: process.env.VITE_VERSION || '1.0.00',
-      mongodb: getMongoStatus().isConnected ? 'conectado' : 'desconectado',
-      environment: process.env.VERCEL ? 'vercel' : 'local',
+      mongodb: getMongoStatus().isConnected ? 'connected' : 'disconnected',
+      environment: isProduction ? 'production' : 'development',
       timestamp: new Date().toISOString()
     });
   } catch (err) {
     res.status(500).json({
       ok: false,
-      error: 'Health check fallo',
+      error: 'Health check failed',
       message: err.message
     });
   }
@@ -246,7 +247,7 @@ app.get('/auth/reset/:token', async (req, res) => {
       try {
         await connectToMongoDB();
       } catch (err) {
-        return res.status(503).send('Servicio de base de datos no disponible');
+        return res.status(503).send('Database service unavailable');
       }
     }
 
@@ -255,7 +256,7 @@ app.get('/auth/reset/:token', async (req, res) => {
       resetTokenExpira: { $gt: Date.now() }
     });
 
-    if (!usuario) return res.status(400).send('Token invalido o expirado');
+    if (!usuario) return res.status(400).send('Invalid or expired token');
 
     return res.send(`
       <!doctype html>
@@ -263,7 +264,7 @@ app.get('/auth/reset/:token', async (req, res) => {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width,initial-scale=1">
-          <title>Restablecer contrasena</title>
+          <title>Reset Password</title>
           <style>
             body { font-family: Arial, sans-serif; max-width:600px; margin:40px auto; padding:20px; }
             label, input, button { display:block; width:100%; }
@@ -272,39 +273,39 @@ app.get('/auth/reset/:token', async (req, res) => {
           </style>
         </head>
         <body>
-          <h2>Restablecer contrasena</h2>
-          <p>Usuario: ${usuario.email}</p>
+          <h2>Reset Password</h2>
+          <p>User: ${usuario.email}</p>
           <form method="POST" action="/auth/reset/${token}">
             <label>
-              Nueva contrasena
-              <input name="nuevaPassword" type="password" placeholder="Nueva contrasena" required minlength="8" />
+              New Password
+              <input name="nuevaPassword" type="password" placeholder="New password" required minlength="8" />
             </label>
-            <button type="submit">Restablecer contrasena</button>
+            <button type="submit">Reset Password</button>
           </form>
         </body>
       </html>
     `);
   } catch (err) {
-    console.error('GET /auth/reset/:token error', err);
-    res.status(500).send('Error interno');
+    console.error('[AUTH] Reset token error:', err);
+    res.status(500).send('Internal error');
   }
 });
 
 // ============================================================
-// MANEJO DE ERRORES
+// ERROR HANDLING
 // ============================================================
 app.use((err, req, res, next) => {
-  console.error('Error no manejado:', err.message);
+  console.error('[ERROR] Unhandled error:', err.message);
   console.error(err.stack);
   res.status(500).json({
     ok: false,
-    error: 'Error interno del servidor',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Contacte al administrador'
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Contact administrator'
   });
 });
 
 // ============================================================
-// INICIO DEL SERVIDOR
+// SERVER STARTUP
 // ============================================================
 const PORT = process.env.PORT || 5001;
 
@@ -312,26 +313,26 @@ if (!process.env.VERCEL) {
   connectToMongoDB()
     .then(() => {
       app.listen(PORT, () => {
-        console.log('\n' + '='.repeat(50));
-        console.log('Servidor corriendo en puerto ' + PORT);
-        console.log('Rutas disponibles:');
-        console.log('  POST   /tickets        - Crear tarea');
-        console.log('  GET    /tickets        - Listar tareas');
-        console.log('  PUT    /tickets/:id/estado - Actualizar estado');
-        console.log('  GET    /tickets/:id/calendar - Descargar ICS');
-        console.log('  GET    /ping-db        - Verificar conexion MongoDB');
+        console.log('='.repeat(50));
+        console.log('Server running on port ' + PORT);
+        console.log('Available routes:');
+        console.log('  POST   /tickets        - Create ticket');
+        console.log('  GET    /tickets        - List tickets');
+        console.log('  PUT    /tickets/:id/estado - Update status');
+        console.log('  GET    /tickets/:id/calendar - Download ICS');
+        console.log('  GET    /ping-db        - Verify MongoDB connection');
         console.log('  GET    /health         - Health check');
-        console.log('='.repeat(50) + '\n');
+        console.log('='.repeat(50));
       });
     })
     .catch(err => {
-      console.error('Fallo al iniciar el servidor:', err.message);
+      console.error('[ERROR] Server startup failed:', err.message);
       process.exit(1);
     });
 } else {
-  console.log('Modo Vercel: Conexion bajo demanda activada');
+  console.log('[STARTUP] Vercel mode: On-demand connection enabled');
   connectToMongoDB().catch(err => {
-    console.warn('Conexion inicial a MongoDB fallo:', err.message);
+    console.warn('[STARTUP] Initial MongoDB connection failed:', err.message);
   });
 }
 

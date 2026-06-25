@@ -1,12 +1,16 @@
+// frontend-react/src/api.js
 import axios from 'axios';
 
+// ============================================
+// API CONFIGURATION
+// ============================================
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 const API_URL = import.meta.env.VITE_API_URL 
   || import.meta.env.VITE_BACKEND_URL 
   || (isLocalhost ? 'http://localhost:5001' : 'https://tareasync.vercel.app');
 
-console.log('API_URL:', API_URL);
+console.log('[API] URL:', API_URL);
 
 const API = axios.create({
   baseURL: API_URL,
@@ -15,30 +19,35 @@ const API = axios.create({
 });
 
 // ============================================
-// INTERCEPTOR - SIEMPRE USAR localStorage
+// REQUEST INTERCEPTOR - AUTH TOKEN
 // ============================================
 API.interceptors.request.use(
   (config) => {
-    // Siempre leer de localStorage directamente
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    console.log('Interceptor - URL:', config.url);
-    console.log('Interceptor - Token existe:', !!token);
+    console.log('[API] Request:', config.method.toUpperCase(), config.url);
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('Interceptor - Token agregado');
+      console.log('[API] Token attached');
     } else {
-      console.warn('Interceptor - No hay token');
+      console.warn('[API] No token available');
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
+// ============================================
+// RESPONSE INTERCEPTOR - ERROR HANDLING
+// ============================================
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('[API] Response:', response.status, response.config.url);
+    return response;
+  },
   (error) => {
-    console.error('API Error:', error.response?.status, error.response?.data);
+    console.error('[API] Error:', error.response?.status, error.response?.data);
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
@@ -50,16 +59,29 @@ API.interceptors.response.use(
   }
 );
 
+// ============================================
+// API HELPERS
+// ============================================
 const handle = (p) => p.then(res => res.data).catch(err => {
   if (err?.response?.data) throw err.response.data;
   if (err?.message) throw { message: err.message };
   throw err;
 });
 
+// ============================================
+// AUTH ENDPOINTS
+// ============================================
 export const login = (data) => handle(API.post('/auth/login', data));
 export const register = (data) => handle(API.post('/auth/register', data));
-export const getTickets = () => handle(API.get('/tickets'));
 export const recuperarPassword = (email) => handle(API.post('/auth/recuperar', { email }));
 export const resetPassword = (token, nuevaPassword) => handle(API.post(`/auth/reset/${token}`, { nuevaPassword }));
 
+// ============================================
+// TICKETS ENDPOINTS
+// ============================================
+export const getTickets = () => handle(API.get('/tickets'));
+
+// ============================================
+// EXPORT DEFAULT
+// ============================================
 export default API;

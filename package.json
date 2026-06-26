@@ -9,7 +9,7 @@
     "build": "cd frontend-react && npm run build",
     "build:all": "npm run build",
     "start": "node api/index.js",
-    "vercel-build": "npm run build",
+    "vercel-build": "cd frontend-react && npm install && npm run build",
     "deploy": "./deploy.sh"
   },
   "engines": {

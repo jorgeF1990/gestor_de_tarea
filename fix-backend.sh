@@ -1,3 +1,20 @@
+#!/bin/bash
+
+echo "=========================================="
+echo "  CORREGIR BACKEND EN VERCEL"
+echo "=========================================="
+
+# 1. Verificar backend/app.js
+echo "[1/4] Verificando backend/app.js..."
+if [ ! -f "backend/app.js" ]; then
+    echo "❌ backend/app.js no existe"
+    exit 1
+fi
+echo "✅ backend/app.js existe"
+
+# 2. Actualizar api/index.js
+echo "[2/4] Actualizando api/index.js..."
+cat > api/index.js << 'API'
 console.log('=== VERCEL SERVERLESS START ===');
 const MONGODB_URI = 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
 if (!process.env.MONGODB_URI) process.env.MONGODB_URI = MONGODB_URI;
@@ -40,3 +57,23 @@ try {
   
   module.exports = fallbackApp;
 }
+API
+
+# 3. Instalar dependencias del backend
+echo "[3/4] Instalando dependencias del backend..."
+cd backend
+npm install --legacy-peer-deps
+cd ..
+
+# 4. Desplegar
+echo "[4/4] Desplegando..."
+git add .
+git commit -m "fix: backend correcto en Vercel $(date +%Y%m%d_%H%M%S)"
+git push origin main
+vercel --prod --force
+
+echo ""
+echo "✅ DEPLOY COMPLETADO"
+echo "URL: https://tareasync.vercel.app"
+echo ""
+echo "Probar: curl https://tareasync.vercel.app/health"

@@ -1,14 +1,10 @@
 import axios from 'axios';
 
 // ============================================
-// API CONFIGURATION
+// API CONFIGURATION - URL EXPLICITA
 // ============================================
-const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-// Usar la variable correcta SIN /api al final
-const API_URL = import.meta.env.VITE_API_URL 
-  || import.meta.env.VITE_BACKEND_URL 
-  || (isLocalhost ? 'http://localhost:5001' : 'https://tareasync.vercel.app');
+// Usar URL fija para evitar problemas con variables de entorno
+const API_URL = 'https://tareasync.vercel.app';
 
 console.log('[API] URL:', API_URL);
 

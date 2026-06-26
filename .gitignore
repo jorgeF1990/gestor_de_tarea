@@ -100,3 +100,4 @@ coverage/
 *.p12
 *.pfx
 *.lock
+.vercel

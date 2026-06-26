@@ -57,6 +57,10 @@
       "dest": "frontend-react/dist/index.html"
     },
     {
+      "src": "/tickets",
+      "dest": "frontend-react/dist/index.html"
+    },
+    {
       "src": "/dashboard",
       "dest": "frontend-react/dist/index.html"
     },

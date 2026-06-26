@@ -2,9 +2,6 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 
-/* =========================
-   SMTP ROBUSTO
-   ========================= */
 const SMTP_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const SMTP_PORT = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587;
 const SMTP_SECURE = SMTP_PORT === 465;
@@ -25,9 +22,6 @@ const transporter = nodemailer.createTransport({
   tls: { minVersion: 'TLSv1.2' }
 });
 
-/* =========================
-   HELPERS
-   ========================= */
 const TZ = 'America/Argentina/Buenos_Aires';
 
 const fmtFecha = d =>
@@ -45,7 +39,6 @@ const fmtDateShort = d =>
 const esc = (s = '') =>
   String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-/* URLs públicas */
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
 const BACKEND_URL  = (process.env.BACKEND_URL  || process.env.APP_URL || '').replace(/\/$/, '');
 const BRAND_NAME   = process.env.BRAND_NAME || 'TaskNest';
@@ -69,8 +62,8 @@ function buildTicketLink(ticket) {
 
 function buildLogoBlock() {
   const logoFileEnv = process.env.BRAND_LOGO_FILE;
-  const backendPublicLogo = path.resolve('public', 'logo.png');
-  const logoUrlRaw = process.env.BRAND_LOGO_URL || '/logo.png';
+  const backendPublicLogo = path.resolve('public', 'logo.svg');
+  const logoUrlRaw = process.env.BRAND_LOGO_URL || '/logo.svg';
 
   const makeCidTag = () =>
     `<img src="cid:brandLogo" width="40" height="40" alt="${BRAND_NAME}" style="display:block;border:0;outline:none;border-radius:8px;">`;
@@ -82,12 +75,11 @@ function buildLogoBlock() {
     }
   }
   if (fs.existsSync(backendPublicLogo)) {
-    return { htmlTag: makeCidTag(), attachment: { filename: 'logo.png', path: backendPublicLogo, cid: 'brandLogo' } };
+    return { htmlTag: makeCidTag(), attachment: { filename: 'logo.svg', path: backendPublicLogo, cid: 'brandLogo' } };
   }
   return { htmlTag: '', attachment: null };
 }
 
-/* ====== INITIALS ====== */
 function initials(email = '') {
   const base = (email.split('@')[0] || '').replace(/[^a-zA-Z0-9]/g, ' ').trim();
   const parts = base.split(/\s+/).filter(Boolean);
@@ -96,7 +88,6 @@ function initials(email = '') {
   return (i1 + i2).toUpperCase().slice(0, 2);
 }
 
-/* ====== COLORES POR ROL ====== */
 function getRoleColors(entry, ticket) {
   const autor = (entry.autor || '').toLowerCase();
   const cliente = (ticket.usuario_id?.email || ticket.creadoPor || '').toLowerCase();
@@ -106,7 +97,6 @@ function getRoleColors(entry, ticket) {
     return email === autor;
   });
   
-  // Admin
   if (autor === 'envios@portfolioinvestment.com.ar' || autor.includes('admin')) {
     return {
       bg: '#faf5ff', border: '#e9d5ff', avatarBg: '#7c3aed',
@@ -115,7 +105,6 @@ function getRoleColors(entry, ticket) {
     };
   }
   
-  // Cliente (creador)
   if (autor && cliente && autor === cliente) {
     return {
       bg: '#f8fafc', border: '#e2e8f0', avatarBg: '#64748b',
@@ -124,7 +113,6 @@ function getRoleColors(entry, ticket) {
     };
   }
   
-  // Agente asignado
   if (autor && esAsignado) {
     return {
       bg: '#f8fafc', border: '#e2e8f0', avatarBg: '#475569',
@@ -133,7 +121,6 @@ function getRoleColors(entry, ticket) {
     };
   }
   
-  // Sistema
   if (autor === 'sistema') {
     return {
       bg: '#faf5ff', border: '#e9d5ff', avatarBg: '#7c3aed',
@@ -142,7 +129,6 @@ function getRoleColors(entry, ticket) {
     };
   }
   
-  // Default
   return {
     bg: '#f8fafc', border: '#e2e8f0', avatarBg: '#64748b',
     badge: '#f1f5f9', badgeText: '#475569', label: '',
@@ -150,7 +136,6 @@ function getRoleColors(entry, ticket) {
   };
 }
 
-/* ====== COMMENT CARD ====== */
 function renderCommentCard(entry, ticket, isLast = false) {
   const when = entry.fecha ? fmtDateTimeShort(new Date(entry.fecha)) : 'Fecha desconocida';
   const autor = esc(entry.autor || 'Sistema');
@@ -200,7 +185,6 @@ function isSameComment(a, b) {
   return sameText && sameAuthor && close;
 }
 
-/* ====== COLORES DE ESTADO Y PRIORIDAD ====== */
 const estadoColores = {
   pendiente:  { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
   abierto:    { bg: '#dcfce7', text: '#065f46', border: '#22c55e' },
@@ -220,44 +204,42 @@ const prioridadColores = {
   urgente:{ bg: '#fef2f2', text: '#7f1d1d', badge: '#dc2626' }
 };
 
-/* ====== FORMATO DE RECURRENCIA ====== */
 function formatRecurrencia(ticket) {
   if (!ticket.es_recurrente || !ticket.recurrencia) return null;
   const rec = ticket.recurrencia;
   if (!rec.activa && !ticket.es_recurrente) return null;
   
-  const tipoTexto = { diaria: 'días', semanal: 'semanas', mensual: 'meses', anual: 'años' };
-  const nombresDias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const tipoTexto = { diaria: 'dias', semanal: 'semanas', mensual: 'meses', anual: 'anos' };
+  const nombresDias = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
   
   let descripcion = `Cada ${rec.intervalo || 1} ${tipoTexto[rec.tipo] || rec.tipo}`;
   if (rec.tipo === 'semanal' && rec.dias_semana?.length) {
     const dias = rec.dias_semana.map(d => nombresDias[d]).join(', ');
     descripcion += ` (${dias})`;
   }
-  if (rec.tipo === 'mensual' && rec.dia_mes) descripcion += ` el día ${rec.dia_mes}`;
-  if (rec.solo_dias_habiles !== false) descripcion += ' · Solo días hábiles';
+  if (rec.tipo === 'mensual' && rec.dia_mes) descripcion += ` el dia ${rec.dia_mes}`;
+  if (rec.solo_dias_habiles !== false) descripcion += ' · Solo dias habiles';
   if (rec.fecha_fin) descripcion += ` · Hasta ${fmtDateShort(new Date(rec.fecha_fin))}`;
   
   return { activa: rec.activa !== false, descripcion, tipo: rec.tipo };
 }
 
-/* ====== SUBJECTS ====== */
 function composeSubject(accion, ticket) {
   const numero = ticket.numero_ticket;
   const asunto = (ticket.asunto || '').trim();
   
   const tipos = {
-    '30_dias': 'Recordatorio 30 días',
-    '21_dias': 'Recordatorio 21 días',
-    '14_dias': 'Recordatorio 14 días',
-    '7_dias': 'Recordatorio 7 días',
-    '3_dias': 'URGENTE - 3 días',
-    '1_dia': 'URGENTE - Vence mañana',
+    '30_dias': 'Recordatorio 30 dias',
+    '21_dias': 'Recordatorio 21 dias',
+    '14_dias': 'Recordatorio 14 dias',
+    '7_dias': 'Recordatorio 7 dias',
+    '3_dias': 'URGENTE - 3 dias',
+    '1_dia': 'URGENTE - Vence manana',
     'hoy': 'URGENTE - Vence HOY',
     'proximo_recordatorio': 'Recordatorio de Vencimiento',
     'vencido_recordatorio': 'Tarea Vencida',
     'vencida_1': 'Tarea Vencida',
-    'vencida_3': 'Tarea Vencida (3 días)',
+    'vencida_3': 'Tarea Vencida (3 dias)',
     'vencida_7': 'Tarea Vencida (1 semana)',
     'vencida_14': 'Tarea Vencida (2 semanas)',
     'vencida_30': 'Tarea Vencida (1 mes)',
@@ -266,14 +248,14 @@ function composeSubject(accion, ticket) {
     'comentario': 'Nuevo Comentario',
     'asignacion_usuario': 'Has sido asignado a una tarea',
     'asignacion_creador': 'Usuario asignado a tu tarea',
-    'asignacion_admin': 'Nueva asignación en tarea',
+    'asignacion_admin': 'Nueva asignacion en tarea',
     'desasignacion_usuario': 'Has sido desasignado de una tarea',
     'desasignacion_creador': 'Usuario desasignado de tu tarea',
-    'desasignacion_admin': 'Desasignación en tarea',
+    'desasignacion_admin': 'Desasignacion en tarea',
     'tarea_recurrente': 'Nueva tarea generada (Recurrencia)'
   };
   
-  const prefijo = tipos[accion] || 'Actualización';
+  const prefijo = tipos[accion] || 'Actualizacion';
   return `${prefijo} · Tarea #${numero}${asunto ? ` · ${asunto}` : ''}`;
 }
 
@@ -285,16 +267,13 @@ function composePreheader(accion, ticket, ultimo) {
   }
   if (accion === 'estado') return `Estado: ${ticket.estado} · Prioridad: ${ticket.prioridad}`;
   if (accion.includes('asignacion') || accion.includes('desasignacion')) return `Tarea #${ticket.numero_ticket}: ${ticket.asunto || ''}`;
-  if (accion === 'tarea_recurrente') return `Nueva tarea generada automáticamente: ${ticket.asunto || ''}`;
+  if (accion === 'tarea_recurrente') return `Nueva tarea generada automaticamente: ${ticket.asunto || ''}`;
   return `Tarea #${ticket.numero_ticket} · ${ticket.estado} · ${ticket.prioridad}`;
 }
 
-/* =========================
-   EMAIL PRINCIPAL
-   ========================= */
 exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, accion = 'crear') => {
   if (!ticket || !ticket.numero_ticket) {
-    console.warn('enviarCorreoTicket: ticket inválido o sin numero_ticket');
+    console.warn('enviarCorreoTicket: ticket invalido o sin numero_ticket');
     return;
   }
 
@@ -334,7 +313,7 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
         <td style="padding:6px 0;${esVencida ? 'color:#dc2626;font-weight:600;' : 'color:#1e293b;'}">
           ${fechaVenStr} a las ${horaVenStr}
           ${esVencida ? '<span style="display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px;">VENCIDA</span>' : ''}
-          ${diasInfo > 0 && !esVencida ? `<span style="display:inline-block;background:#fefce8;color:#a16207;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;margin-left:8px;">En ${diasInfo} días</span>` : ''}
+          ${diasInfo > 0 && !esVencida ? `<span style="display:inline-block;background:#fefce8;color:#a16207;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500;margin-left:8px;">En ${diasInfo} dias</span>` : ''}
         </td>
       </tr>
     `;
@@ -362,10 +341,10 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
     '14_dias': 'Recordatorio de Vencimiento',
     '7_dias': 'Recordatorio Importante',
     '3_dias': 'Aviso Urgente de Vencimiento',
-    '1_dia': 'La tarea vence mañana',
+    '1_dia': 'La tarea vence manana',
     'hoy': 'La tarea vence hoy',
     'proximo_recordatorio': 'Recordatorio de Vencimiento',
-    'vencido_recordatorio': 'Tarea Pendiente de Resolución',
+    'vencido_recordatorio': 'Tarea Pendiente de Resolucion',
     'vencida_1': 'Tarea Vencida',
     'vencida_3': 'Tarea Vencida',
     'vencida_7': 'Tarea Vencida',
@@ -376,25 +355,25 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
     'comentario': 'Nuevo Comentario',
     'asignacion_usuario': 'Has sido asignado a una tarea',
     'asignacion_creador': 'Usuario asignado a tu tarea',
-    'asignacion_admin': 'Nueva asignación',
+    'asignacion_admin': 'Nueva asignacion',
     'desasignacion_usuario': 'Has sido desasignado',
     'desasignacion_creador': 'Usuario desasignado',
-    'desasignacion_admin': 'Desasignación',
-    'tarea_recurrente': 'Tarea Generada Automáticamente'
+    'desasignacion_admin': 'Desasignacion',
+    'tarea_recurrente': 'Tarea Generada Automaticamente'
   };
   
-  const tituloNotificacion = titulosTipo[accion] || 'Actualización de Tarea';
+  const tituloNotificacion = titulosTipo[accion] || 'Actualizacion de Tarea';
   
   const labelAccion = accion.includes('dias') || accion === 'hoy' || accion.includes('vencida') ||
                       accion === 'proximo_recordatorio' || accion === 'vencido_recordatorio'
     ? 'Recordatorio'
     : accion === 'crear' ? 'Nueva Tarea'
-    : accion === 'estado' ? 'Actualización'
+    : accion === 'estado' ? 'Actualizacion'
     : accion === 'comentario' ? 'Comentario'
-    : accion.includes('asignacion') ? 'Asignación'
-    : accion.includes('desasignacion') ? 'Desasignación'
+    : accion.includes('asignacion') ? 'Asignacion'
+    : accion.includes('desasignacion') ? 'Desasignacion'
     : accion === 'tarea_recurrente' ? 'Recurrencia'
-    : 'Actualización';
+    : 'Actualizacion';
 
   const subject = composeSubject(accion, ticket);
   const preheaderText = composePreheader(accion, ticket, 
@@ -423,7 +402,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
     ? itemsHistorial.join('')
     : '';
 
-  // Texto plano
   const textLines = [];
   textLines.push(`Tarea #${numero} - ${tituloNotificacion}`);
   textLines.push('');
@@ -434,8 +412,8 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
   textLines.push(`Creado por: ${creador}`);
   textLines.push(`Estado: ${estado} · Prioridad: ${prioridad}`);
   textLines.push('');
-  textLines.push('Descripción:');
-  textLines.push(ticket.descripcion || 'Sin descripción');
+  textLines.push('Descripcion:');
+  textLines.push(ticket.descripcion || 'Sin descripcion');
   
   if (accion === 'comentario' && ultimo) {
     textLines.push('');
@@ -455,7 +433,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
   textLines.push('No responda a este correo. Ingrese al sistema para continuar con el seguimiento.');
   const text = textLines.join('\n');
 
-  // HTML
   const preheader = esc(preheaderText || '');
 
   let html = `
@@ -493,7 +470,7 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
             </td>
           </tr>
 
-          <!-- Título -->
+          <!-- Titulo -->
           <tr>
             <td style="padding:20px 28px 0;">
               <div style="font-size:20px;font-weight:700;color:#0f172a;line-height:1.4;">${tituloNotificacion}</div>
@@ -517,15 +494,14 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
                 </tr>
               </table>
 
-              <!-- Descripción -->
+              <!-- Descripcion -->
               <div style="margin-top:16px;">
-                <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px;">Descripción</div>
+                <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px;">Descripcion</div>
                 <div style="font-size:14px;line-height:1.65;color:#334155;background:#f8fafc;border:1px solid #e8ecf0;border-radius:10px;padding:14px 16px;">
-                  ${descripcion || '<span style="color:#94a3b8;">Sin descripción</span>'}
+                  ${descripcion || '<span style="color:#94a3b8;">Sin descripcion</span>'}
                 </div>
               </div>
 
-              <!-- Recordatorio -->
               ${ticket.descripcionRecordatorio ? `
               <div style="margin-top:16px;padding:14px 16px;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:8px;">
                 <div style="font-size:13px;font-weight:600;color:#92400e;">Aviso Importante</div>
@@ -533,7 +509,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
               </div>
               ` : ''}
 
-              <!-- Último comentario -->
               ${accion === 'comentario' && ultimoHtml ? `
               <div style="margin-top:20px;">
                 <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:10px;">Nuevo Comentario</div>
@@ -541,7 +516,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
               </div>
               ` : ''}
 
-              <!-- Historial -->
               ${Array.isArray(ticket.historial) && ticket.historial.length ? `
               <div style="margin-top:20px;">
                 <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:10px;">Historial Reciente</div>
@@ -549,7 +523,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
               </div>
               ` : ''}
 
-              <!-- Botón -->
               ${FRONTEND_URL ? `
               <div style="margin-top:20px;text-align:center;">
                 <a href="${enlaceTicket}" target="_blank" rel="noopener noreferrer"
@@ -559,9 +532,8 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
               </div>
               ` : ''}
 
-              <!-- Silenciar -->
               <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:8px;text-align:center;">
-                <span style="font-size:12px;color:#94a3b8;">No desea recibir más avisos sobre esta tarea?</span>
+                <span style="font-size:12px;color:#94a3b8;">No desea recibir mas avisos sobre esta tarea?</span>
                 <a href="${FRONTEND_URL}/tareas/${ticket._id}/silenciar" style="color:#4f46e5;text-decoration:none;font-size:12px;font-weight:500;margin-left:4px;">Silenciar notificaciones</a>
               </div>
             </td>
@@ -571,7 +543,7 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
           <tr>
             <td style="padding:16px 28px;border-top:1px solid #e8ecf0;background:#f8fafc;text-align:center;">
               <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
-                Este es un mensaje automático del Sistema de Gestión de Tareas de ${BRAND_NAME}.<br>
+                Este es un mensaje automatico del Sistema de Gestion de Tareas de ${BRAND_NAME}.<br>
                 Por favor, no responda a este correo.
               </div>
             </td>
@@ -585,7 +557,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
 </html>
   `;
 
-  // Adjuntos
   const attachments = [];
   if (imagenPath) {
     const full = path.resolve(imagenPath);
@@ -629,7 +600,6 @@ exports.enviarCorreoTicket = async (ticket, destinatarios, imagenPath = null, ac
   }
 };
 
-/* Útil para otros mails simples */
 async function enviarCorreo(to, subject, text, html = null) {
   const mailOptions = {
     from: EMAIL_FROM,

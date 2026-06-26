@@ -1,25 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import API from '../api';
-import { jwtDecode } from 'jwt-decode';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import API from '../api';
 import './Auth.css';
-
 
 export default function Register() {
   const navigate = useNavigate();
 
-  const [name, setName]       = useState('');
-  const [email, setEmail]     = useState('');
-  const [pass, setPass]       = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
 
-  const [show1, setShow1]     = useState(false);
-  const [show2, setShow2]     = useState(false);
+  const [show1, setShow1] = useState(false);
+  const [show2, setShow2] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg]         = useState({ type: '', text: '' });
+  const [msg, setMsg] = useState({ type: '', text: '' });
 
-  // Indicador simple de fortaleza
   const strength = useMemo(() => {
     const p = pass || '';
     let s = 0;
@@ -45,30 +43,30 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg({ type:'', text:'' });
+    setMsg({ type: '', text: '' });
 
     const err = validate();
-    if (err) { setMsg({ type:'err', text: err }); return; }
+    if (err) {
+      setMsg({ type: 'err', text: err });
+      return;
+    }
 
     try {
       setLoading(true);
 
-      // 1) Registrar
-      await API.post(`${API}/auth/register`, {
-        nombre: name,      // si tu backend espera "nombre"
+      await API.post('/auth/register', {
+        nombre: name,
         email,
         password: pass
       });
 
-      // 2) Auto-login para obtener token
-      const { data } = await API.post(`${API}/auth/login`, { email, password: pass });
+      const { data } = await API.post('/auth/login', { email, password: pass });
       if (!data?.token) {
-        setMsg({ type:'err', text:'No se pudo iniciar sesión automáticamente. Ingresá manualmente.' });
+        setMsg({ type: 'err', text: 'No se pudo iniciar sesión automáticamente. Ingresá manualmente.' });
         navigate('/login');
         return;
       }
 
-      // 3) Guardar token en storage elegido
       if (remember) {
         localStorage.setItem('token', data.token);
         sessionStorage.removeItem('token');
@@ -77,20 +75,13 @@ export default function Register() {
         localStorage.removeItem('token');
       }
 
-      // 4) Redirigir según rol y forzar re-render global con storage event
-      try {
-        jwtDecode(data.token); // valida sintaxis
-      } catch { /* ignore */ }
-
-      // Dispara un evento para que otros componentes reactualicen estado de auth
       window.dispatchEvent(new StorageEvent('storage', { key: 'token', newValue: data.token }));
 
-      setMsg({ type:'ok', text:'Cuenta creada. Redirigiendo…' });
-      // Ir al Home (tu Home ya muestra crear ticket si hay token)
+      setMsg({ type: 'ok', text: 'Cuenta creada. Redirigiendo…' });
       navigate('/');
     } catch (error) {
       const text = error?.response?.data?.error || 'No se pudo crear la cuenta.';
-      setMsg({ type:'err', text });
+      setMsg({ type: 'err', text });
     } finally {
       setLoading(false);
     }
@@ -103,11 +94,16 @@ export default function Register() {
           <img src="/logo.svg" alt="Logo" className="auth-logo" />
           <div>
             <div className="auth-title">Crear cuenta</div>
-            <div className="auth-sub">TaskNest• Sistema de Tareas</div>
+            <div className="auth-sub">TareaSync • Sistema de Tareas</div>
           </div>
         </div>
 
-        {msg.text && <div className={`auth-msg ${msg.type}`}>{msg.text}</div>}
+        {msg.text && (
+          <div className={`auth-msg ${msg.type}`}>
+            {msg.type === 'ok' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {msg.text}
+          </div>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-row">
@@ -118,7 +114,7 @@ export default function Register() {
               className="auth-input"
               placeholder="Tu nombre"
               value={name}
-              onChange={e=>setName(e.target.value)}
+              onChange={e => setName(e.target.value)}
               autoFocus
               required
             />
@@ -132,7 +128,7 @@ export default function Register() {
               className="auth-input"
               placeholder="nombre@empresa.com"
               value={email}
-              onChange={e=>setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               required
             />
           </div>
@@ -146,7 +142,7 @@ export default function Register() {
                 className="auth-input"
                 placeholder="Mínimo 8 caracteres"
                 value={pass}
-                onChange={e=>setPass(e.target.value)}
+                onChange={e => setPass(e.target.value)}
                 minLength={8}
                 required
                 autoComplete="new-password"
@@ -154,11 +150,11 @@ export default function Register() {
               <button
                 type="button"
                 className="eye-btn"
-                onClick={()=>setShow1(s=>!s)}
+                onClick={() => setShow1(s => !s)}
                 aria-label={show1 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={show1 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {show1 ? '🙈' : '👁️'}
+                {show1 ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
@@ -180,7 +176,7 @@ export default function Register() {
                 className="auth-input"
                 placeholder="Repetí la contraseña"
                 value={confirm}
-                onChange={e=>setConfirm(e.target.value)}
+                onChange={e => setConfirm(e.target.value)}
                 minLength={8}
                 required
                 autoComplete="new-password"
@@ -188,25 +184,29 @@ export default function Register() {
               <button
                 type="button"
                 className="eye-btn"
-                onClick={()=>setShow2(s=>!s)}
+                onClick={() => setShow2(s => !s)}
                 aria-label={show2 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={show2 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {show2 ? '🙈' : '👁️'}
+                {show2 ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
           <div className="auth-row inline">
-            <label style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+              />
               Recordarme
             </label>
             <Link className="auth-link" to="/login">¿Ya tenés cuenta? Ingresar</Link>
           </div>
 
           <button className="auth-btn" type="submit" disabled={loading}>
-            {loading ? <span className="loader" /> : 'Crear cuenta'}
+            {loading ? <Loader2 size={20} className="spin" /> : 'Crear cuenta'}
           </button>
         </form>
 
@@ -217,4 +217,3 @@ export default function Register() {
     </div>
   );
 }
-

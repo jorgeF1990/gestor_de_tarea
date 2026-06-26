@@ -14,9 +14,27 @@ import {
   ArcElement,
 } from "chart.js";
 import { Bar, Doughnut, Pie, Line } from "react-chartjs-2";
+import { 
+  Download, 
+  FileSpreadsheet, 
+  FileText, 
+  Printer, 
+  Calendar as CalendarIcon,
+  Filter,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+  Users,
+  Ticket,
+  BarChart3,
+  PieChart,
+  LineChart
+} from 'lucide-react';
 import "./StatsPage.css";
 
-// PDF / Print
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -33,7 +51,6 @@ ChartJS.register(
   Filler
 );
 
-/* ========= Helpers para campos heterogéneos ========= */
 const guessAuthor = (t) =>
   t.creador || t.usuario || t.cliente || t.createdBy || t.autor || t?.usuario_id?.email || "desconocido";
 
@@ -66,7 +83,6 @@ const formatHours = (ms) => {
   return `${h.toFixed(2)} h`;
 };
 
-/* ========= Paletas ========= */
 const PALETTE = [
   "#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ef4444",
   "#8b5cf6", "#ec4899", "#f97316", "#64748b", "#14b8a6",
@@ -83,11 +99,9 @@ const colorByEstado = {
   sin_estado: "#94a3b8",
 };
 
-/* ========= SLA Targets (en horas) ========= */
 const SLA_FIRST_RESPONSE_H = Number(import.meta.env.VITE_SLA_FIRST_RESPONSE_H || 4);
 const SLA_RESOLUTION_H     = Number(import.meta.env.VITE_SLA_RESOLUTION_H || 48);
 
-/* ========= Inferencias robustas desde historial ========= */
 const resolvedStates = new Set(["resuelto", "cerrado"]);
 
 const earliestHistDate = (t) => {
@@ -135,7 +149,6 @@ const inferResolvedAt = (t) => {
   return null;
 };
 
-/* ========= NUEVO: Inferir fecha de vencimiento ========= */
 const inferDueDate = (t) => {
   const direct = t.fecha_vencimiento || t.dueDate || t.vencimiento;
   if (direct) return direct;
@@ -155,7 +168,6 @@ export default function StatsPage({ tickets: propTickets }) {
   const [tickets, setTickets] = useState(propTickets || []);
   const [loading, setLoading] = useState(false);
 
-  // Filtros de periodo
   const [preset, setPreset] = useState("30");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -169,7 +181,7 @@ export default function StatsPage({ tickets: propTickets }) {
       setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await API.get(`${import.meta.env.VITE_BACKEND_URL}/tickets`, {
+        const res = await API.get('/tickets', {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (mounted) setTickets(res.data || []);
@@ -251,7 +263,6 @@ export default function StatsPage({ tickets: propTickets }) {
     const rsDailySum = {};
     const rsDailyCount = {};
 
-    // Variables para vencimiento
     let vencidasCount = 0;
     let vencenHoyCount = 0;
     let vencenSemanaCount = 0;
@@ -285,7 +296,6 @@ export default function StatsPage({ tickets: propTickets }) {
         }
       }
 
-      // Contar tareas vencidas
       const dueDate = inferDueDate(t);
       const isClosed = st === 'cerrado' || st === 'resuelto';
       
@@ -522,12 +532,20 @@ export default function StatsPage({ tickets: propTickets }) {
 
   const printPage = () => window.print();
 
-  if (loading) return <div className="stats-loading">Cargando estadísticas…</div>;
+  if (loading) return (
+    <div className="stats-loading">
+      <Loader2 size={32} className="spin" />
+      <span>Cargando estadísticas...</span>
+    </div>
+  );
 
   return (
     <div className="stats-page" ref={statsRef}>
       <div className="stats-topbar no-print">
-        <h2>Estadísticas</h2>
+        <h2>
+          <BarChart3 size={20} />
+          Estadísticas
+        </h2>
         <div className="filters">
           <select
             value={preset}
@@ -549,40 +567,121 @@ export default function StatsPage({ tickets: propTickets }) {
           )}
 
           <div className="range-hint">
+            <CalendarIcon size={14} />
             Rango activo: <strong>{rangeStart}</strong> → <strong>{rangeEnd}</strong>
           </div>
 
           <div className="actions">
-            <button className="btn" onClick={exportCSV}>Exportar CSV</button>
-            <button className="btn btn-secondary" onClick={exportAggregatesCSV}>Exportar métricas</button>
-            <button className="btn btn-outline" onClick={exportPDF}>Exportar PDF</button>
-            <button className="btn btn-outline" onClick={printPage}>Imprimir</button>
+            <button className="btn" onClick={exportCSV}>
+              <FileSpreadsheet size={16} />
+              Exportar CSV
+            </button>
+            <button className="btn btn-secondary" onClick={exportAggregatesCSV}>
+              <FileText size={16} />
+              Exportar métricas
+            </button>
+            <button className="btn btn-outline" onClick={exportPDF}>
+              <Download size={16} />
+              Exportar PDF
+            </button>
+            <button className="btn btn-outline" onClick={printPage}>
+              <Printer size={16} />
+              Imprimir
+            </button>
           </div>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="kpi-row">
-        <div className="kpi"><div className="kpi-title">Total</div><div className="kpi-value">{totals.total}</div></div>
-        <div className="kpi"><div className="kpi-title">Abiertos</div><div className="kpi-value">{totals.abiertos}</div></div>
-        <div className="kpi"><div className="kpi-title">Pendientes</div><div className="kpi-value">{totals.pendientes}</div></div>
-        <div className="kpi"><div className="kpi-title">En proceso</div><div className="kpi-value">{totals.enProceso}</div></div>
-        <div className="kpi"><div className="kpi-title">Resueltos</div><div className="kpi-value">{totals.resueltos}</div></div>
+        <div className="kpi">
+          <div className="kpi-icon"><Ticket size={20} /></div>
+          <div>
+            <div className="kpi-title">Total</div>
+            <div className="kpi-value">{totals.total}</div>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-icon"><FolderOpen size={20} style={{ color: '#22c55e' }} /></div>
+          <div>
+            <div className="kpi-title">Abiertos</div>
+            <div className="kpi-value">{totals.abiertos}</div>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-icon"><Clock size={20} style={{ color: '#e11d48' }} /></div>
+          <div>
+            <div className="kpi-title">Pendientes</div>
+            <div className="kpi-value">{totals.pendientes}</div>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-icon"><Loader2 size={20} style={{ color: '#f59e0b' }} /></div>
+          <div>
+            <div className="kpi-title">En proceso</div>
+            <div className="kpi-value">{totals.enProceso}</div>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-icon"><CheckCircle size={20} style={{ color: '#10b981' }} /></div>
+          <div>
+            <div className="kpi-title">Resueltos</div>
+            <div className="kpi-value">{totals.resueltos}</div>
+          </div>
+        </div>
         
-        {/* KPIs de vencimiento */}
-        <div className="kpi kpi-vencido"><div className="kpi-title"> Vencidas</div><div className="kpi-value">{vencidas}</div></div>
-        <div className="kpi kpi-hoy"><div className="kpi-title"> Vencen hoy</div><div className="kpi-value">{vencenHoy}</div></div>
-        <div className="kpi kpi-semana"><div className="kpi-title"> Próxima semana</div><div className="kpi-value">{vencenSemana}</div></div>
+        <div className="kpi kpi-vencido">
+          <div className="kpi-icon"><AlertCircle size={20} style={{ color: '#ef4444' }} /></div>
+          <div>
+            <div className="kpi-title">Vencidas</div>
+            <div className="kpi-value">{vencidas}</div>
+          </div>
+        </div>
+        <div className="kpi kpi-hoy">
+          <div className="kpi-icon"><Clock size={20} style={{ color: '#f59e0b' }} /></div>
+          <div>
+            <div className="kpi-title">Vencen hoy</div>
+            <div className="kpi-value">{vencenHoy}</div>
+          </div>
+        </div>
+        <div className="kpi kpi-semana">
+          <div className="kpi-icon"><CalendarIcon size={20} style={{ color: '#3b82f6' }} /></div>
+          <div>
+            <div className="kpi-title">Próxima semana</div>
+            <div className="kpi-value">{vencenSemana}</div>
+          </div>
+        </div>
         
-        <div className="kpi"><div className="kpi-title">FCR</div><div className="kpi-value">{`${clamp(firstContactResolution, 0, 100).toFixed(1)}%`}</div></div>
-        <div className="kpi"><div className="kpi-title">1ª respuesta</div><div className="kpi-value">{formatHours(avgFirstResponse)}</div></div>
-        <div className="kpi"><div className="kpi-title">Resolución</div><div className="kpi-value">{formatHours(avgResolution)}</div></div>
+        <div className="kpi">
+          <div className="kpi-icon"><TrendingUp size={20} style={{ color: '#8b5cf6' }} /></div>
+          <div>
+            <div className="kpi-title">FCR</div>
+            <div className="kpi-value">{`${clamp(firstContactResolution, 0, 100).toFixed(1)}%`}</div>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-icon"><Clock size={20} style={{ color: '#0ea5e9' }} /></div>
+          <div>
+            <div className="kpi-title">1ª respuesta</div>
+            <div className="kpi-value">{formatHours(avgFirstResponse)}</div>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-icon"><CheckCircle size={20} style={{ color: '#10b981' }} /></div>
+          <div>
+            <div className="kpi-title">Resolución</div>
+            <div className="kpi-value">{formatHours(avgResolution)}</div>
+          </div>
+        </div>
       </div>
 
       {/* Tickets por día */}
       <div className="charts-row">
         <div className="chart-card wide avoid-break">
-          <div className="card-title">Tareas/día (creados)</div>
+          <div className="card-title">
+            <LineChart size={16} />
+            Tareas/día (creados)
+          </div>
           <Line
             data={{
               labels: dayKeysSorted,
@@ -627,7 +726,10 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
 
         <div className="chart-card avoid-break">
-          <div className="card-title">Distribución por estado</div>
+          <div className="card-title">
+            <PieChart size={16} />
+            Distribución por estado
+          </div>
           <Doughnut
             data={{
               labels: Object.keys(byState),
@@ -660,10 +762,13 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
       </div>
 
-      {/* Nueva gráfica de vencimiento */}
+      {/* Estado de vencimiento y Prioridad */}
       <div className="charts-row">
         <div className="chart-card avoid-break">
-          <div className="card-title"> Estado de vencimiento</div>
+          <div className="card-title">
+            <AlertCircle size={16} />
+            Estado de vencimiento
+          </div>
           <Doughnut
             data={{
               labels: ['Vencidas', 'Vencen hoy', 'Próxima semana', 'Sin vencimiento próximo'],
@@ -692,7 +797,10 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
 
         <div className="chart-card avoid-break">
-          <div className="card-title">Distribución por prioridad</div>
+          <div className="card-title">
+            <Flag size={16} />
+            Distribución por prioridad
+          </div>
           <Pie
             data={{
               labels: prioLabels,
@@ -721,7 +829,10 @@ export default function StatsPage({ tickets: propTickets }) {
       {/* Apilado por estado */}
       <div className="charts-row">
         <div className="chart-card wide avoid-break">
-          <div className="card-title">Mezcla por estado (apilado por día)</div>
+          <div className="card-title">
+            <BarChart3 size={16} />
+            Mezcla por estado (apilado por día)
+          </div>
           <Bar
             data={{ labels: dayKeysSorted, datasets: stackedDatasets }}
             options={{
@@ -741,10 +852,12 @@ export default function StatsPage({ tickets: propTickets }) {
           />
         </div>
 
-        {/* Distribución por tipo (condicional) */}
         {Object.keys(byType).length > 0 && Object.values(byType).some(v => v > 0) ? (
           <div className="chart-card avoid-break">
-            <div className="card-title">Distribución por tipo</div>
+            <div className="card-title">
+              <FolderOpen size={16} />
+              Distribución por tipo
+            </div>
             <Pie
               data={{
                 labels: typeLabels,
@@ -770,7 +883,10 @@ export default function StatsPage({ tickets: propTickets }) {
           </div>
         ) : (
           <div className="chart-card avoid-break">
-            <div className="card-title">Distribución por tipo</div>
+            <div className="card-title">
+              <FolderOpen size={16} />
+              Distribución por tipo
+            </div>
             <div className="empty">Sin datos suficientes en este período.</div>
           </div>
         )}
@@ -779,7 +895,10 @@ export default function StatsPage({ tickets: propTickets }) {
       {/* Top solicitantes + Día de la semana */}
       <div className="charts-row">
         <div className="chart-card avoid-break">
-          <div className="card-title">Top 10 solicitantes</div>
+          <div className="card-title">
+            <Users size={16} />
+            Top 10 solicitantes
+          </div>
           <Bar
             data={{
               labels: topUsersLabels,
@@ -804,7 +923,10 @@ export default function StatsPage({ tickets: propTickets }) {
         </div>
 
         <div className="chart-card avoid-break">
-          <div className="card-title">Tareas por día de la semana</div>
+          <div className="card-title">
+            <CalendarIcon size={16} />
+            Tareas por día de la semana
+          </div>
           <Bar
             data={{
               labels: weekdayLabels,
@@ -826,7 +948,10 @@ export default function StatsPage({ tickets: propTickets }) {
       <div className="charts-row">
         {countFirstResponse > 0 ? (
           <div className="chart-card wide avoid-break">
-            <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
+            <div className="card-title">
+              <Clock size={16} />
+              Tiempo promedio de 1ª respuesta (h) por día
+            </div>
             <Line
               data={{
                 labels: frDailyLabels,
@@ -859,7 +984,7 @@ export default function StatsPage({ tickets: propTickets }) {
                         const v = ctx[0]?.parsed?.y;
                         if (typeof v === "number") {
                           const ok = v <= SLA_FIRST_RESPONSE_H;
-                          return ok ? "✅ Dentro de SLA" : "⛔ Fuera de SLA";
+                          return ok ? "Dentro de SLA" : "Fuera de SLA";
                         }
                         return "";
                       },
@@ -881,14 +1006,20 @@ export default function StatsPage({ tickets: propTickets }) {
           </div>
         ) : (
           <div className="chart-card wide avoid-break">
-            <div className="card-title">Tiempo promedio de 1ª respuesta (h) por día</div>
+            <div className="card-title">
+              <Clock size={16} />
+              Tiempo promedio de 1ª respuesta (h) por día
+            </div>
             <div className="empty">No hay tareas con 1ª respuesta registrada.</div>
           </div>
         )}
 
         {countResolution > 0 ? (
           <div className="chart-card avoid-break">
-            <div className="card-title">Tiempo promedio de resolución (h) por día</div>
+            <div className="card-title">
+              <CheckCircle size={16} />
+              Tiempo promedio de resolución (h) por día
+            </div>
             <Line
               data={{
                 labels: rsDailyLabels,
@@ -921,7 +1052,7 @@ export default function StatsPage({ tickets: propTickets }) {
                         const v = ctx[0]?.parsed?.y;
                         if (typeof v === "number") {
                           const ok = v <= SLA_RESOLUTION_H;
-                          return ok ? "✅ Dentro de SLA" : "⛔ Fuera de SLA";
+                          return ok ? "Dentro de SLA" : "Fuera de SLA";
                         }
                         return "";
                       },
@@ -943,7 +1074,10 @@ export default function StatsPage({ tickets: propTickets }) {
           </div>
         ) : (
           <div className="chart-card avoid-break">
-            <div className="card-title">Tiempo promedio de resolución (h) por día</div>
+            <div className="card-title">
+              <CheckCircle size={16} />
+              Tiempo promedio de resolución (h) por día
+            </div>
             <div className="empty">No hay tareas resueltos/cerrados en el rango.</div>
           </div>
         )}

@@ -1,19 +1,18 @@
 // frontend-react/src/components/Login.jsx
 import React, { useContext, useState } from 'react';
-import API from '../api';
-import { jwtDecode } from 'jwt-decode';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import API from '../api';
 import { AuthContext } from '../context/AuthContext';
 import './Auth.css';
-
 
 function Login() {
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
 
   const [email, setEmail] = useState('');
-  const [pass, setPass]   = useState('');
-  const [show, setShow]   = useState(false);
+  const [pass, setPass] = useState('');
+  const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
@@ -22,24 +21,24 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg({ type:'', text:'' });
+    setMsg({ type: '', text: '' });
 
     const emailClean = email.trim();
-    const passClean  = pass.trim();
+    const passClean = pass.trim();
     if (!emailClean || !passClean) {
-      setMsg({ type:'err', text:'Ingresá tu correo y contraseña.' });
+      setMsg({ type: 'err', text: 'Ingresá tu correo y contraseña.' });
       return;
     }
 
     try {
       setLoading(true);
-      console.log('Enviando petición a:', `${API}/auth/login`);
+      console.log('Enviando petición a:', '/auth/login');
       console.log('Email:', emailClean);
-      
-      const response = await API.post(`${API}/auth/login`, 
-        { email: emailClean, password: passClean },
-        { withCredentials: false }
-      );
+
+      const response = await API.post('/auth/login', {
+        email: emailClean,
+        password: passClean
+      });
 
       console.log('Respuesta completa:', response);
       console.log('Data:', response.data);
@@ -47,34 +46,31 @@ function Login() {
 
       if (!response.data?.token) {
         console.error('Token no encontrado en la respuesta');
-        setMsg({ type:'err', text:'Respuesta inválida del servidor.' });
+        setMsg({ type: 'err', text: 'Respuesta inválida del servidor.' });
         return;
       }
 
-      // Guardar token en localStorage
       localStorage.setItem('token', response.data.token);
       console.log('Token guardado en localStorage');
 
-      // Guarda token vía contexto
       if (login) {
         await login(response.data.token, { remember });
       }
 
-      // Redirigir
       navigate('/tickets');
     } catch (err) {
       console.error('Error en login:', err);
       console.error('Response:', err.response);
       console.error('Data:', err.response?.data);
-      
+
       if (err?.response?.status === 404) {
         setMsg({
-          type:'err',
-          text:`No se encontró la ruta de login. Verificá que el backend exponga POST ${API}/auth/login`
+          type: 'err',
+          text: 'No se encontró la ruta de login. Verificá que el backend esté funcionando.'
         });
       } else {
         const text = err.response?.data?.message || err.response?.data?.error || 'No se pudo iniciar sesión.';
-        setMsg({ type:'err', text });
+        setMsg({ type: 'err', text });
       }
     } finally {
       setLoading(false);
@@ -104,7 +100,7 @@ function Login() {
               className="auth-input"
               placeholder="nombre@empresa.com"
               value={email}
-              onChange={e=>setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               autoFocus
               autoComplete="email"
               inputMode="email"
@@ -124,7 +120,7 @@ function Login() {
                 className="auth-input"
                 placeholder="••••••••"
                 value={pass}
-                onChange={e=>setPass(e.target.value)}
+                onChange={e => setPass(e.target.value)}
                 autoComplete="current-password"
                 required
                 minLength={6}
@@ -132,21 +128,21 @@ function Login() {
               <button
                 type="button"
                 className="eye-btn"
-                onClick={()=>setShow(s=>!s)}
+                onClick={() => setShow(s => !s)}
                 aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {show ? '🙈' : '👁️'}
+                {show ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
           <div className="auth-row inline">
-            <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="checkbox"
                 checked={remember}
-                onChange={e=>setRemember(e.target.checked)}
+                onChange={e => setRemember(e.target.checked)}
               />
               Recordarme
             </label>
@@ -154,7 +150,7 @@ function Login() {
           </div>
 
           <button className="auth-btn" type="submit" disabled={!canSubmit}>
-            {loading ? <span className="loader" /> : 'Ingresar'}
+            {loading ? <Loader2 size={20} className="spin" /> : 'Ingresar'}
           </button>
         </form>
 

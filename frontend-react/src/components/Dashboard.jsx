@@ -177,7 +177,7 @@ function Dashboard() {
     if (estadoFiltro) params.append('estado', estadoFiltro);
     if (prioridadFiltro) params.append('prioridad', prioridadFiltro);
     try {
-      const res = await API.get(`${API}/tickets?${params.toString()}`, {
+      const res = await API.get(`/tickets?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const ordenados = (res.data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
@@ -261,7 +261,7 @@ function Dashboard() {
     }
 
     try {
-      const res = await API.put(`${API}/tickets/${id}/estado`, payload, {
+      const res = await API.put(`/tickets/${id}/estado`, payload, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
 
@@ -325,7 +325,7 @@ function Dashboard() {
     if (nuevoComentario) formData.append('comentario', nuevoComentario);
     if (nuevoArchivo) formData.append('imagen', nuevoArchivo);
     try {
-      await API.put(`${API}/tickets/${id}/comentario`, formData, {
+      await API.put(`/tickets/${id}/comentario`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCambios(prev => {

@@ -1,40 +1,83 @@
 import React, { useState } from 'react';
-import { recuperarPassword } from '../api'; // Asegurate de tener esta función en tu archivo de API
+import { Link } from 'react-router-dom';
+import { recuperarPassword } from '../api';
+import './Auth.css';
 
 function Recuperar() {
   const [email, setEmail] = useState('');
   const [mensaje, setMensaje] = useState('');
+  const [loading, setLoading] = useState(false);
   const version = import.meta.env.VITE_VERSION;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMensaje('');
+    setLoading(true);
+
+    if (!email.trim()) {
+      setMensaje('Por favor, ingresá tu correo electrónico.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await recuperarPassword(email);
-      setMensaje(' Revisa tu Email para recuperar la contraseña');
-    } catch {
-      setMensaje(' Error al enviar el Email');
+      await recuperarPassword(email.trim());
+      setMensaje('Revisá tu email para recuperar la contraseña.');
+      setEmail('');
+    } catch (error) {
+      const msg = error?.response?.data?.error || error?.message || 'Error al enviar el email.';
+      setMensaje(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-container">
-      <img src="/logo.svg" alt="Logo" className="login-logo" />
-      <h1 className="text-2xl font-bold text-black">TareaSync</h1>
-      <h2>🔐 Recuperar contraseña</h2>
-      <form onSubmit={handleSubmit} className="login-form">
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          placeholder=" Email registrado"
-          required
-        />
-        <div className="login-btn-wrapper">
-          <button type="submit" className="home-btn">Send Link</button>
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="auth-head">
+          <img src="/logo.svg" alt="Logo" className="auth-logo" />
+          <div>
+            <div className="auth-title">Recuperar contraseña</div>
+            <div className="auth-sub">TareaSync • Sistema de Tareas</div>
+          </div>
         </div>
-      </form>
-      {mensaje && <p>{mensaje}</p>}
-      <p className="app-version">Versión: {version}</p>
+
+        {mensaje && (
+          <div className={`auth-msg ${mensaje.includes('Revisá') ? 'ok' : 'err'}`}>
+            {mensaje}
+          </div>
+        )}
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="auth-row">
+            <label className="auth-label" htmlFor="email">Correo electrónico</label>
+            <input
+              id="email"
+              type="email"
+              className="auth-input"
+              placeholder="nombre@empresa.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoFocus
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <button className="auth-btn" type="submit" disabled={loading}>
+            {loading ? <span className="loader" /> : 'Enviar enlace'}
+          </button>
+        </form>
+
+        <div className="auth-foot">
+          <Link className="auth-link" to="/login">Volver a Iniciar sesión</Link>
+          <span className="auth-separator">•</span>
+          <Link className="auth-link" to="/register">Crear cuenta</Link>
+        </div>
+
+        <div className="auth-version">Versión: {version}</div>
+      </div>
     </div>
   );
 }

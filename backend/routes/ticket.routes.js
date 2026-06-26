@@ -1,11 +1,10 @@
 // backend/routes/ticket.routes.js
 const express = require('express');
-const path = require('path');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-const auth = require('../middlewares/authMiddleware');
+const auth = require('../middlewares/auth');
 
 const {
   crearTicket,
@@ -23,32 +22,8 @@ const {
   actualizarRecurrencia
 } = require('../controllers/tickets.controller');
 
-console.log('=== CARGANDO TICKET ROUTES ===');
-
 const router = express.Router();
 
-console.log('Rutas de tickets registradas:');
-console.log('  POST / (crear)');
-console.log('  GET / (listar)');
-console.log('  GET /:id');
-console.log('  PUT /:id/estado');
-console.log('  PUT /:id/comentario');
-console.log('  PUT /:id/leido');
-console.log('  DELETE /:id');
-console.log('  GET /:id/calendar');
-console.log('  GET /:id/recurrencia');
-console.log('  PUT /:id/recurrencia');
-console.log('  POST /:id/silenciar');
-console.log('  POST /:id/reanudar');
-console.log('  GET /:id/notificaciones/estado');
-console.log('  GET /:id/asignados');
-console.log('  POST /:id/asignar');
-console.log('  DELETE /:id/asignar/:usuarioId');
-console.log('  GET /usuarios/disponibles');
-
-/* =========================
-   Cloudinary para subida de imagenes
-   ========================= */
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dfuybsomz',
   api_key: process.env.CLOUDINARY_API_KEY || '99688937873469',
@@ -78,9 +53,6 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-/* =========================
-   Rutas CRUD principales
-   ========================= */
 router.post('/', auth, upload.single('imagen'), crearTicket);
 router.get('/', auth, obtenerTickets);
 router.get('/:id', auth, obtenerTicketPorId);
@@ -90,17 +62,17 @@ router.put('/:id/leido', auth, marcarLeido);
 router.delete('/:id', auth, eliminarTicket);
 router.get('/:id/calendar', auth, generarEventoCalendar);
 
-/* =========================
-   ENDPOINTS DE RECURRENCIA
-   ========================= */
 router.put('/:id/recurrencia', auth, actualizarRecurrencia);
+
 router.get('/:id/recurrencia', auth, async (req, res) => {
   try {
     const Ticket = require('../models/ticket.model');
     const ticket = await Ticket.findById(req.params.id)
       .select('es_recurrente recurrencia numero_ticket');
     
-    if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
     
     res.json({
       es_recurrente: ticket.es_recurrente,
@@ -108,13 +80,11 @@ router.get('/:id/recurrencia', auth, async (req, res) => {
       numero_ticket: ticket.numero_ticket
     });
   } catch (error) {
+    console.error('Error al obtener recurrencia:', error.message);
     res.status(500).json({ error: 'Error al obtener configuracion' });
   }
 });
 
-/* =========================
-   ENDPOINTS PARA NOTIFICACIONES
-   ========================= */
 router.post('/:id/silenciar', auth, async (req, res) => {
   try {
     const Ticket = require('../models/ticket.model');
@@ -122,7 +92,9 @@ router.post('/:id/silenciar', auth, async (req, res) => {
     const { dias } = req.body;
     
     const ticket = await Ticket.findById(id);
-    if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
     
     const esPropietario = ticket.usuario_id.toString() === req.user.id;
     const esAdmin = req.user.rol === 'admin';
@@ -131,7 +103,7 @@ router.post('/:id/silenciar', auth, async (req, res) => {
       return res.status(403).json({ error: 'No autorizado' });
     }
     
-    let silenciarHasta = new Date();
+    const silenciarHasta = new Date();
     const diasASilenciar = dias || 30;
     silenciarHasta.setDate(silenciarHasta.getDate() + diasASilenciar);
     
@@ -142,9 +114,12 @@ router.post('/:id/silenciar', auth, async (req, res) => {
       }
     }, { runValidators: false });
     
-    res.json({ success: true, message: `Notificaciones silenciadas hasta ${silenciarHasta.toLocaleDateString()}` });
+    res.json({ 
+      success: true, 
+      message: `Notificaciones silenciadas hasta ${silenciarHasta.toLocaleDateString()}` 
+    });
   } catch (error) {
-    console.error('Error al silenciar notificaciones:', error);
+    console.error('Error al silenciar notificaciones:', error.message);
     res.status(500).json({ error: 'Error al procesar la solicitud' });
   }
 });
@@ -155,7 +130,9 @@ router.post('/:id/reanudar', auth, async (req, res) => {
     const { id } = req.params;
     
     const ticket = await Ticket.findById(id);
-    if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
     
     const esPropietario = ticket.usuario_id.toString() === req.user.id;
     const esAdmin = req.user.rol === 'admin';
@@ -173,7 +150,7 @@ router.post('/:id/reanudar', auth, async (req, res) => {
     
     res.json({ success: true, message: 'Notificaciones reanudadas' });
   } catch (error) {
-    console.error('Error al reanudar notificaciones:', error);
+    console.error('Error al reanudar notificaciones:', error.message);
     res.status(500).json({ error: 'Error al procesar la solicitud' });
   }
 });
@@ -183,11 +160,16 @@ router.get('/:id/notificaciones/estado', auth, async (req, res) => {
     const Ticket = require('../models/ticket.model');
     const { id } = req.params;
     
-    const ticket = await Ticket.findById(id).select('silenciar_notificaciones_hasta notificaciones_habilitadas ultimo_recordatorio_enviado');
-    if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
+    const ticket = await Ticket.findById(id)
+      .select('silenciar_notificaciones_hasta notificaciones_habilitadas ultimo_recordatorio_enviado');
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
     
     const ahora = new Date();
-    const silenciado = ticket.silenciar_notificaciones_hasta && new Date(ticket.silenciar_notificaciones_hasta) > ahora;
+    const silenciado = ticket.silenciar_notificaciones_hasta && 
+                       new Date(ticket.silenciar_notificaciones_hasta) > ahora;
     
     res.json({
       habilitadas: ticket.notificaciones_habilitadas && !silenciado,
@@ -195,19 +177,14 @@ router.get('/:id/notificaciones/estado', auth, async (req, res) => {
       ultimoRecordatorio: ticket.ultimo_recordatorio_enviado
     });
   } catch (error) {
-    console.error('Error al obtener estado:', error);
+    console.error('Error al obtener estado:', error.message);
     res.status(500).json({ error: 'Error al procesar la solicitud' });
   }
 });
 
-/* =========================
-   ENDPOINTS DE ASIGNACION DE USUARIOS
-   ========================= */
 router.get('/:id/asignados', auth, obtenerAsignados);
 router.post('/:id/asignar', auth, asignarUsuario);
 router.delete('/:id/asignar/:usuarioId', auth, desasignarUsuario);
 router.get('/usuarios/disponibles', auth, obtenerUsuariosDisponibles);
-
-console.log('=== TICKET ROUTES CARGADAS ===');
 
 module.exports = router;

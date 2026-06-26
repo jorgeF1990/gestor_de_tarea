@@ -1,7 +1,8 @@
 // src/components/ResetPassword.jsx
 import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { resetPassword } from '../api'; // Debe exportar: resetPassword(token, newPassword)
+import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { resetPassword } from '../api';
 import './Auth.css';
 
 export default function ResetPassword() {
@@ -13,10 +14,9 @@ export default function ResetPassword() {
   const [show1, setShow1]       = useState(false);
   const [show2, setShow2]       = useState(false);
   const [loading, setLoading]   = useState(false);
-  const [status, setStatus]     = useState(null); // { type: 'ok'|'error', message: string }
+  const [status, setStatus]     = useState(null);
 
   const strength = useMemo(() => {
-    // Indicador simple de fortaleza
     const p = password || '';
     let s = 0;
     if (p.length >= 8) s++;
@@ -24,7 +24,7 @@ export default function ResetPassword() {
     if (/[a-z]/.test(p)) s++;
     if (/[0-9]/.test(p)) s++;
     if (/[^A-Za-z0-9]/.test(p)) s++;
-    return Math.min(s, 4); // 0..4
+    return Math.min(s, 4);
   }, [password]);
 
   const strengthLabel = ['Muy débil', 'Débil', 'Aceptable', 'Buena', 'Fuerte'][strength] || 'Muy débil';
@@ -52,7 +52,6 @@ export default function ResetPassword() {
     try {
       const res = await resetPassword(token, password);
       setStatus({ type: 'ok', message: res?.message || 'Contraseña actualizada correctamente.' });
-      // Pequeña pausa para que el usuario lea el mensaje y redirigir
       setTimeout(() => navigate('/login'), 1800);
     } catch (error) {
       const message =
@@ -69,7 +68,7 @@ export default function ResetPassword() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-head">
-          <img src="/logo.png" alt="Logo" className="auth-logo" />
+          <img src="/logo.svg" alt="Logo" className="auth-logo" />
           <div>
             <div className="auth-title">Restablecer contraseña</div>
             <div className="auth-sub">Ingresá tu nueva contraseña</div>
@@ -78,6 +77,7 @@ export default function ResetPassword() {
 
         {status?.message && (
           <div className={`auth-msg ${status.type === 'ok' ? 'ok' : 'err'}`}>
+            {status.type === 'ok' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
             {status.message}
           </div>
         )}
@@ -110,11 +110,10 @@ export default function ResetPassword() {
                 aria-label={show1 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={show1 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {show1 ? '🙈' : '👁️'}
+                {show1 ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
-            {/* Indicador de fortaleza */}
             <div className="pw-strength">
               <div className={`bar ${strength >= 1 ? 'on' : ''}`} />
               <div className={`bar ${strength >= 2 ? 'on' : ''}`} />
@@ -145,19 +144,21 @@ export default function ResetPassword() {
                 aria-label={show2 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={show2 ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {show2 ? '🙈' : '👁️'}
+                {show2 ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
           <button className="auth-btn" type="submit" disabled={!canSubmit || loading}>
-            {loading ? <span className="loader" /> : 'Restablecer contraseña'}
+            {loading ? <Loader2 size={20} className="spin" /> : 'Restablecer contraseña'}
           </button>
         </form>
 
         <div className="auth-foot">
-          <Link className="auth-link" to="/login">Volver a Ingresar</Link>
-          <span style={{ opacity:.5, margin: '0 .5rem' }}>•</span>
+          <Link className="auth-link" to="/login">
+            <ArrowLeft size={14} /> Volver a Ingresar
+          </Link>
+          <span className="auth-separator">•</span>
           <Link className="auth-link" to="/recuperar">Solicitar nuevo enlace</Link>
         </div>
       </div>

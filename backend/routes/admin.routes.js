@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middlewares/authMiddleware');
+const auth = require('../middlewares/auth');
 const User = require('../models/User');
 const { generarTicketsRecurrentes } = require('../controllers/tickets.controller');
 
 // Todas las rutas requieren autenticación y rol admin
 router.use(auth);
+
 router.use((req, res, next) => {
   if (req.user.rol !== 'admin') {
     return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
@@ -13,24 +14,21 @@ router.use((req, res, next) => {
   next();
 });
 
-// Obtener todos los usuarios
 router.get('/usuarios', async (req, res) => {
   try {
     const usuarios = await User.find({}, '-password');
     res.json(usuarios);
   } catch (error) {
-    console.error('Error al obtener usuarios:', error);
+    console.error('Error al obtener usuarios:', error.message);
     res.status(500).json({ error: 'Error al obtener usuarios' });
   }
 });
 
-// Actualizar usuario
 router.put('/usuarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { rol, activo, notificaciones } = req.body;
     
-    // No permitir que un admin se desactive a sí mismo
     if (id === req.user.id && activo === false) {
       return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
     }
@@ -45,12 +43,11 @@ router.put('/usuarios/:id', async (req, res) => {
     
     res.json(usuario);
   } catch (error) {
-    console.error('Error al actualizar usuario:', error);
+    console.error('Error al actualizar usuario:', error.message);
     res.status(500).json({ error: 'Error al actualizar usuario' });
   }
 });
 
-// ========== ENDPOINT ADMIN: FORZAR GENERACIÓN DE TICKETS RECURRENTES ==========
 router.post('/generar-recurrentes', async (req, res) => {
   try {
     const resultado = await generarTicketsRecurrentes();
@@ -60,6 +57,7 @@ router.post('/generar-recurrentes', async (req, res) => {
       ...resultado 
     });
   } catch (error) {
+    console.error('Error al generar tickets recurrentes:', error.message);
     res.status(500).json({ 
       error: 'Error al generar tickets recurrentes', 
       detalle: error.message 

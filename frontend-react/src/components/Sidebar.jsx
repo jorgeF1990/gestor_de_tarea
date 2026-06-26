@@ -1,6 +1,7 @@
 // frontend-react/src/components/Sidebar.jsx
 import React, { useContext } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
+import { Home, Ticket, LayoutDashboard, BarChart3, LogOut, User, LogIn, UserPlus } from 'lucide-react';
 import { AuthContext } from "../context/AuthContext";
 import "./Sidebar.css";
 
@@ -35,23 +36,23 @@ export default function Sidebar({ open, onToggle }) {
           <div className="sidebar-section-title">General</div>
 
           <NavLink to="/" className="sidebar-link" onClick={maybeClose}>
-            <span className="icon"></span>
+            <span className="icon"><Home size={18} /></span>
             <span className="label">Home</span>
           </NavLink>
 
           <NavLink to="/tickets" className="sidebar-link" onClick={maybeClose}>
-            <span className="icon"></span>
+            <span className="icon"><Ticket size={18} /></span>
             <span className="label">Tareas</span>
           </NavLink>
 
           {user?.rol === "admin" && (
             <>
               <NavLink to="/dashboard" className="sidebar-link" onClick={maybeClose}>
-                <span className="icon"></span>
+                <span className="icon"><LayoutDashboard size={18} /></span>
                 <span className="label">Dashboard</span>
               </NavLink>
               <NavLink to="/stats" className="sidebar-link" onClick={maybeClose}>
-                <span className="icon"></span>
+                <span className="icon"><BarChart3 size={18} /></span>
                 <span className="label">Estadísticas</span>
               </NavLink>
             </>
@@ -65,18 +66,20 @@ export default function Sidebar({ open, onToggle }) {
           {!user ? (
             <>
               <NavLink to="/login" className="sidebar-link" onClick={maybeClose}>
-                <span className="icon"></span>
+                <span className="icon"><LogIn size={18} /></span>
                 <span className="label">Login</span>
               </NavLink>
               <NavLink to="/register" className="sidebar-link" onClick={maybeClose}>
-                <span className="icon"></span>
+                <span className="icon"><UserPlus size={18} /></span>
                 <span className="label">Register</span>
               </NavLink>
             </>
           ) : (
             <>
               <div className="sidebar-user">
-                <div className="user-avatar" aria-hidden></div>
+                <div className="user-avatar" aria-hidden>
+                  <User size={16} />
+                </div>
                 <div className="user-meta">
                   <div className="user-email" title={user.email}>
                     {user.email}
@@ -86,7 +89,7 @@ export default function Sidebar({ open, onToggle }) {
               </div>
 
               <button className="sidebar-btn" onClick={handleLogout}>
-                <span className="icon"></span>
+                <span className="icon"><LogOut size={18} /></span>
                 <span className="label">Salir</span>
               </button>
             </>

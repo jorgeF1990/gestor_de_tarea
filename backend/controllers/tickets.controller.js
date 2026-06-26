@@ -20,6 +20,21 @@ const resolveAppUrlFromReq = (req) => {
 
 const ADMIN_EMAIL = 'envios@portfolioinvestment.com.ar';
 
+const ESTADOS_VALIDOS = {
+  ABIERTO: 'abierto',
+  PENDIENTE: 'pendiente',
+  EN_PROCESO: 'en_proceso',
+  RESUELTO: 'resuelto',
+  CERRADO: 'cerrado',
+  REABIERTO: 'reabierto',
+  CANCELADO: 'cancelado',
+  ARCHIVADO: 'archivado'
+};
+
+const ESTADOS_FINALES = [ESTADOS_VALIDOS.CERRADO, ESTADOS_VALIDOS.RESUELTO, ESTADOS_VALIDOS.ARCHIVADO];
+
+const TIPOS_RECURRENCIA = ['diaria', 'semanal', 'mensual', 'anual'];
+
 async function esAdminOAgente(email) {
   if (!email) return false;
   try {
@@ -33,8 +48,7 @@ async function esAdminOAgente(email) {
 async function getDestinatariosNotificacion(ticket, actorEmail, accion) {
   let destinatarios = [];
   
-  const creadorEmail = ticket.usuario_id?.email || 
-                       (typeof ticket.usuario_id === 'string' ? null : null);
+  const creadorEmail = ticket.usuario_id?.email || null;
   
   let emailsAsignados = [];
   if (ticket.asignados && ticket.asignados.length > 0) {
@@ -77,22 +91,10 @@ async function getDestinatariosNotificacion(ticket, actorEmail, accion) {
       break;
       
     case 'estado':
-      if (creadorEmail) destinatarios.push(creadorEmail);
-      destinatarios.push(...emailsAsignados.filter(e => e !== actorEmail));
-      destinatarios.push(ADMIN_EMAIL);
-      if (actorEmail) destinatarios.push(actorEmail);
-      break;
-      
     case 'asignacion':
-      if (creadorEmail) destinatarios.push(creadorEmail);
-      destinatarios.push(...emailsAsignados);
-      destinatarios.push(ADMIN_EMAIL);
-      if (actorEmail) destinatarios.push(actorEmail);
-      break;
-      
     case 'desasignacion':
       if (creadorEmail) destinatarios.push(creadorEmail);
-      destinatarios.push(...emailsAsignados);
+      destinatarios.push(...emailsAsignados.filter(e => e !== actorEmail));
       destinatarios.push(ADMIN_EMAIL);
       if (actorEmail) destinatarios.push(actorEmail);
       break;
@@ -106,28 +108,23 @@ async function getDestinatariosNotificacion(ticket, actorEmail, accion) {
   return uniq(destinatarios).filter(e => e);
 }
 
+const obtenerUrlImagen = (file) => {
+  return file ? file.path || file.filename || null : null;
+};
+
+const getEstadoFinal = (estado) => {
+  return ESTADOS_FINALES.includes(estado) ? estado : null;
+};
+
 /* ==================== CREAR TICKET ==================== */
 exports.crearTicket = async (req, res) => {
-  console.log('=== CREAR TICKET INICIO ===');
-  console.log('req.user:', req.user);
-  console.log('req.file:', req.file);
-  console.log('req.file.path:', req.file?.path);
-  console.log('req.file.filename:', req.file?.filename);
-  console.log('req.body:', req.body);
-  console.log('req.headers.authorization:', req.headers.authorization);
-  
   if (!req.user || !req.user.id) {
-    console.error('ERROR: req.user no existe o no tiene id');
     return res.status(401).json({ 
-      error: 'Usuario no autenticado correctamente',
-      detalle: 'No se encontro el usuario en la request'
+      error: 'Usuario no autenticado correctamente'
     });
   }
 
   try {
-    console.log('crearTicket llamado - body:', req.body);
-    console.log('crearTicket llamado - user:', req.user);
-    
     const asunto = (req.body?.asunto || '').toString().trim();
     const descripcion = (req.body?.descripcion || '').toString();
     
@@ -149,8 +146,8 @@ exports.crearTicket = async (req, res) => {
       const intervalo = parseInt(req.body?.recurrencia_intervalo) || 1;
       const soloDiasHabiles = req.body?.solo_dias_habiles !== 'false' && req.body?.solo_dias_habiles !== false;
       
-      if (!tipo || !['diaria', 'semanal', 'mensual', 'anual'].includes(tipo)) {
-        return res.status(400).json({ error: 'Tipo de recurrencia invalido. Use: diaria, semanal, mensual o anual' });
+      if (!tipo || !TIPOS_RECURRENCIA.includes(tipo)) {
+        return res.status(400).json({ error: 'Tipo de recurrencia invalido' });
       }
       
       if (soloDiasHabiles && fecha_vencimiento) {
@@ -195,9 +192,7 @@ exports.crearTicket = async (req, res) => {
     }
     
     const numeroCorto = generateShortId();
-    // IMPORTANTE: req.file.path contiene la URL de Cloudinary
-    const imagen = req.file ? req.file.path : null; // ← URL de Cloudinary
-    console.log('Imagen URL guardada:', imagen);
+    const imagen = obtenerUrlImagen(req.file);
 
     if (!asunto) {
       return res.status(400).json({ error: 'El asunto es requerido' });
@@ -233,7 +228,7 @@ exports.crearTicket = async (req, res) => {
       descripcion,
       numero_ticket: numeroCorto,
       prioridad: 'media',
-      estado: 'pendiente',
+      estado: ESTADOS_VALIDOS.PENDIENTE,
       imagen: imagen || null,
       fecha_vencimiento,
       es_recurrente: esRecurrente,
@@ -241,7 +236,7 @@ exports.crearTicket = async (req, res) => {
       asignados: asignadosIniciales,
       historial: [{
         fecha: new Date(),
-        estado: 'pendiente',
+        estado: ESTADOS_VALIDOS.PENDIENTE,
         comentario: 'Tarea creada.' + descripcionRecurrencia + '\nAsunto: ' + asunto + '\nDescripcion: ' + descripcion + (fecha_vencimiento ? '\nFecha vencimiento: ' + fecha_vencimiento.toLocaleString() : ''),
         autor: req.user.email
       }],
@@ -256,17 +251,14 @@ exports.crearTicket = async (req, res) => {
     ticket.ultimo_autor = req.user.email;
 
     const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'crear');
-    const imagenPath = imagen ? 'uploads/' + imagen : null;
     
     if (destinatarios.length) {
-      await enviarCorreoTicket(ticket, destinatarios, imagenPath, 'crear');
-      console.log('[CREAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
+      await enviarCorreoTicket(ticket, destinatarios, imagen, 'crear');
     }
 
     res.status(201).json(ticket);
   } catch (err) {
-    console.error('Error al crear tarea:', err);
-    console.error('Stack:', err.stack);
+    console.error('Error al crear tarea:', err.message);
     res.status(500).json({ error: 'Error al crear tarea', detalle: err.message });
   }
 };
@@ -280,7 +272,7 @@ exports.agregarComentario = async (req, res) => {
     }
 
     const comentario = (req.body?.comentario || '').toString();
-    const imagen = req.file?.filename || null;
+    const imagen = obtenerUrlImagen(req.file);
 
     if (!comentario && !imagen) {
       return res.status(400).json({ mensaje: 'Comentario o imagen requerido' });
@@ -311,22 +303,20 @@ exports.agregarComentario = async (req, res) => {
     ).populate('usuario_id', 'email')
      .populate('asignados', 'email nombre');
 
-    if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada tras update' });
+    if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
 
     updated.APP_URL = resolveAppUrlFromReq(req);
     updated.ultimo_autor = req.user.email;
 
     const destinatarios = await getDestinatariosNotificacion(updated, req.user.email, 'comentario');
-    const imagenPath = imagen ? 'uploads/' + imagen : null;
     
     if (destinatarios.length) {
-      await enviarCorreoTicket(updated, destinatarios, imagenPath, 'comentario');
-      console.log('[COMENTARIO] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
+      await enviarCorreoTicket(updated, destinatarios, imagen, 'comentario');
     }
 
     res.json(updated);
   } catch (err) {
-    console.error('Error al agregar comentario:', err);
+    console.error('Error al agregar comentario:', err.message);
     res.status(500).json({ error: 'Error al agregar comentario' });
   }
 };
@@ -338,15 +328,20 @@ exports.actualizarEstado = async (req, res) => {
     const { id } = req.params;
     const rol = req.user?.rol;
 
-    if (!['admin','soporte'].includes(rol)) {
-      return res.status(403).json({ mensaje: 'No autorizado para cambiar estado' });
+    if (!['admin', 'soporte'].includes(rol)) {
+      return res.status(403).json({ mensaje: 'No autorizado' });
     }
 
     if (!req.user?.email) {
       return res.status(401).json({ mensaje: 'Usuario no autenticado' });
     }
+
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ mensaje: 'ID invalido' });
+    }
+
+    if (!estado) {
+      return res.status(400).json({ mensaje: 'Estado requerido' });
     }
 
     const ticket = await Ticket.findById(id);
@@ -354,8 +349,9 @@ exports.actualizarEstado = async (req, res) => {
       return res.status(404).json({ mensaje: 'Tarea no encontrada' });
     }
 
-    if (!estado) {
-      return res.status(400).json({ mensaje: 'Estado requerido' });
+    // Si el estado es final, registrar fecha de cierre
+    if (ESTADOS_FINALES.includes(estado)) {
+      ticket.fecha_cierre = new Date();
     }
 
     ticket.estado = estado;
@@ -363,7 +359,7 @@ exports.actualizarEstado = async (req, res) => {
 
     res.json(ticket);
   } catch (err) {
-    console.error('Error al actualizar estado:', err);
+    console.error('Error al actualizar estado:', err.message);
     res.status(500).json({ error: 'Error al actualizar estado' });
   }
 };
@@ -371,12 +367,9 @@ exports.actualizarEstado = async (req, res) => {
 /* ==================== LISTAR TICKETS ==================== */
 exports.obtenerTickets = async (req, res) => {
   try {
-    console.log('obtenerTickets llamado');
-    console.log('req.user:', req.user);
-    
     const { estado, prioridad } = req.query;
     const userId = req.user.id;
-    const isAdmin = req.user.rol === 'admin' || req.user.rol === 'soporte';
+    const isAdmin = ['admin', 'soporte'].includes(req.user.rol);
 
     let filtro = {};
     
@@ -386,15 +379,13 @@ exports.obtenerTickets = async (req, res) => {
       filtro = {
         $and: [
           { $or: [{ usuario_id: userId }, { asignados: userId }] },
-          { estado: { $ne: 'archivada' } }
+          { estado: { $ne: ESTADOS_VALIDOS.ARCHIVADO } }
         ]
       };
     }
     
     if (estado) filtro.estado = estado;
     if (prioridad) filtro.prioridad = prioridad;
-
-    console.log('Filtro aplicado:', JSON.stringify(filtro));
 
     let tickets = await Ticket.find(filtro)
       .populate('usuario_id', 'email')
@@ -417,11 +408,10 @@ exports.obtenerTickets = async (req, res) => {
       return getTs(b) - getTs(a);
     });
 
-    console.log('Usuario ' + req.user.email + ' (' + req.user.rol + ') - Tareas encontradas: ' + tickets.length);
     res.json(tickets);
   } catch (err) {
     console.error('Error al obtener tareas:', err.message);
-    res.status(500).json({ error: 'Error al obtener tareas', detalle: err.message });
+    res.status(500).json({ error: 'Error al obtener tareas' });
   }
 };
 
@@ -429,7 +419,9 @@ exports.obtenerTickets = async (req, res) => {
 exports.obtenerTicketPorId = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'ID invalido' });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'ID invalido' });
+    }
 
     const ticket = await Ticket.findById(id)
       .populate('usuario_id', 'email')
@@ -437,20 +429,21 @@ exports.obtenerTicketPorId = async (req, res) => {
 
     if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
 
-    const esAdmin = req.user.rol === 'admin' || req.user.rol === 'soporte';
+    const esAdmin = ['admin', 'soporte'].includes(req.user.rol);
     const esCreador = ticket.usuario_id._id.toString() === req.user.id;
     const esAsignado = ticket.asignados?.some(a => a._id.toString() === req.user.id);
 
     if (!esAdmin && !esCreador && !esAsignado) {
-      return res.status(403).json({ error: 'No autorizado para ver esta tarea' });
+      return res.status(403).json({ error: 'No autorizado' });
     }
-    if (!esAdmin && ticket.estado === 'archivada') {
-      return res.status(403).json({ error: 'Esta tarea ha sido archivada y no esta disponible' });
+    
+    if (!esAdmin && ticket.estado === ESTADOS_VALIDOS.ARCHIVADO) {
+      return res.status(403).json({ error: 'Esta tarea ha sido archivada' });
     }
 
     res.json(ticket);
   } catch (err) {
-    console.error('Error al obtener tarea:', err);
+    console.error('Error al obtener tarea:', err.message);
     res.status(500).json({ error: 'Error al obtener tarea' });
   }
 };
@@ -460,13 +453,17 @@ exports.marcarLeido = async (req, res) => {
   try {
     const { id } = req.params;
     const usuario = req.user.email;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ mensaje: 'ID invalido' });
+    
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ mensaje: 'ID invalido' });
+    }
 
     let updated = await Ticket.findOneAndUpdate(
       { _id: id, 'leidoPor.usuario': usuario },
       { $set: { 'leidoPor.$.fecha': new Date() } },
       { new: true }
     );
+    
     if (!updated) {
       updated = await Ticket.findOneAndUpdate(
         { _id: id },
@@ -474,11 +471,13 @@ exports.marcarLeido = async (req, res) => {
         { new: true }
       );
     }
+    
     if (!updated) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
+    
     res.json(updated);
   } catch (err) {
-    console.error('Error al marcar tarea como leida:', err.message);
-    res.status(500).json({ error: 'Error al marcar tarea como leida' });
+    console.error('Error al marcar leido:', err.message);
+    res.status(500).json({ error: 'Error al marcar leido' });
   }
 };
 
@@ -487,22 +486,31 @@ exports.eliminarTicket = async (req, res) => {
   try {
     const { id } = req.params;
     const ticketEliminado = await Ticket.findByIdAndDelete(id);
-    if (!ticketEliminado) return res.status(404).json({ mensaje: 'Tarea no encontrada' });
+    
+    if (!ticketEliminado) {
+      return res.status(404).json({ mensaje: 'Tarea no encontrada' });
+    }
+    
     res.json({ mensaje: 'Tarea eliminada correctamente' });
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al eliminar la tarea', error });
+    console.error('Error al eliminar tarea:', error.message);
+    res.status(500).json({ mensaje: 'Error al eliminar la tarea' });
   }
 };
 
-/* ==================== GENERAR EVENTO DE CALENDARIO (.ICS) ==================== */
+/* ==================== GENERAR EVENTO CALENDARIO (.ICS) ==================== */
 exports.generarEventoCalendar = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ mensaje: 'ID invalido' });
+    
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ mensaje: 'ID invalido' });
+    }
 
     const ticket = await Ticket.findById(id).select('asunto descripcion fecha_vencimiento numero_ticket');
+    
     if (!ticket || !ticket.fecha_vencimiento) {
-      return res.status(404).json({ mensaje: 'Tarea no encontrada o sin fecha de vencimiento.' });
+      return res.status(404).json({ mensaje: 'Tarea sin fecha de vencimiento.' });
     }
 
     const start = ticket.fecha_vencimiento;
@@ -524,14 +532,13 @@ exports.generarEventoCalendar = async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="ticket-' + ticket.numero_ticket + '.ics"');
     cal.stream(res);
   } catch (err) {
-    console.error('Error al generar evento de calendario:', err);
+    console.error('Error al generar evento calendar:', err.message);
     res.status(500).json({ error: 'Error al generar evento de calendario' });
   }
 };
 
 /* ==================== SCHEDULER: NOTIFICACIONES DE VENCIMIENTO ==================== */
 exports.revisarTicketsProximosAVencer = async () => {
-  console.log('Iniciando revision de tickets para recordatorios...');
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -546,7 +553,7 @@ exports.revisarTicketsProximosAVencer = async () => {
     threeDaysAgo.setDate(today.getDate() - 3);
 
     const filtro = {
-      estado: { $nin: ['cerrado', 'finalizado', 'resuelto', 'archivada', 'archivado'] },
+      estado: { $nin: ESTADOS_FINALES },
       fecha_vencimiento: { $exists: true, $ne: null },
       $or: [
         {
@@ -568,12 +575,7 @@ exports.revisarTicketsProximosAVencer = async () => {
       .populate('asignados', 'email')
       .select('numero_ticket asunto fecha_vencimiento usuario_id asignados');
 
-    if (tickets.length === 0) {
-      console.log('No se encontraron tickets para recordatorio.');
-      return;
-    }
-
-    console.log('Encontrados ' + tickets.length + ' tickets para recordatorio.');
+    if (tickets.length === 0) return;
 
     for (const ticket of tickets) {
       const destinatarios = await getDestinatariosNotificacion(ticket, null, 'estado');
@@ -587,18 +589,15 @@ exports.revisarTicketsProximosAVencer = async () => {
           { _id: ticket._id },
           { $set: { last_vencimiento_notification: new Date() } }
         );
-        console.log('[VENCIMIENTO] Recordatorio #' + ticket.numero_ticket + ' - ' + destinatarios.length + ' destinatarios');
       }
     }
   } catch (err) {
-    console.error('Error en revision de tickets:', err);
+    console.error('Error en revision de tickets:', err.message);
   }
 };
 
 /* ==================== GENERAR TICKETS RECURRENTES ==================== */
 exports.generarTicketsRecurrentes = async () => {
-  console.log('[' + new Date().toISOString() + '] Generando tickets recurrentes...');
-  
   try {
     const ahora = new Date();
     const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
@@ -608,7 +607,7 @@ exports.generarTicketsRecurrentes = async () => {
       es_recurrente: true,
       'recurrencia.activa': true,
       'recurrencia.ticket_padre': null,
-      estado: { $nin: ['archivado', 'cancelado', 'archivada'] },
+      estado: { $nin: [ESTADOS_VALIDOS.ARCHIVADO, ESTADOS_VALIDOS.CANCELADO] },
       $or: [
         { 'recurrencia.fecha_fin': { $exists: false } },
         { 'recurrencia.fecha_fin': null },
@@ -616,7 +615,6 @@ exports.generarTicketsRecurrentes = async () => {
       ]
     }).populate('usuario_id', 'email').populate('asignados', 'email');
     
-    console.log(ticketsRecurrentes.length + ' tickets recurrentes activos');
     let generados = 0;
     
     for (const ticket of ticketsRecurrentes) {
@@ -637,7 +635,7 @@ exports.generarTicketsRecurrentes = async () => {
               descripcion: ticket.descripcion,
               numero_ticket: generateShortId(),
               prioridad: ticket.prioridad,
-              estado: 'pendiente',
+              estado: ESTADOS_VALIDOS.PENDIENTE,
               fecha_vencimiento: proximaFecha,
               imagen: ticket.imagen,
               es_recurrente: false,
@@ -645,7 +643,7 @@ exports.generarTicketsRecurrentes = async () => {
               asignados: ticket.asignados || [],
               historial: [{
                 fecha: new Date(),
-                estado: 'pendiente',
+                estado: ESTADOS_VALIDOS.PENDIENTE,
                 comentario: 'Tarea generada automaticamente por recurrencia desde Ticket #' + ticket.numero_ticket,
                 autor: 'sistema'
               }],
@@ -658,7 +656,6 @@ exports.generarTicketsRecurrentes = async () => {
             });
             
             generados++;
-            console.log('Generado Ticket #' + nuevoTicket.numero_ticket + ' para ' + proximaFecha.toLocaleDateString('es-AR'));
             
             try {
               const appUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -666,7 +663,6 @@ exports.generarTicketsRecurrentes = async () => {
               const destinatarios = await getDestinatariosNotificacion(ticket, null, 'estado');
               if (destinatarios.length) {
                 await enviarCorreoTicket(nuevoTicket, destinatarios, null, 'tarea_recurrente');
-                console.log('[RECURRENCIA] Notificacion enviada a ' + destinatarios.length + ' destinatarios');
               }
             } catch (mailError) {
               console.error('Error enviando email de recurrencia:', mailError.message);
@@ -678,10 +674,9 @@ exports.generarTicketsRecurrentes = async () => {
       }
     }
     
-    console.log('Generacion completada: ' + generados + ' nuevos tickets');
     return { generados, revisados: ticketsRecurrentes.length };
   } catch (error) {
-    console.error('Error en generacion de tickets recurrentes:', error);
+    console.error('Error en generacion de tickets recurrentes:', error.message);
     throw error;
   }
 };
@@ -692,33 +687,69 @@ exports.actualizarRecurrencia = async (req, res) => {
     const { id } = req.params;
     const { activa, tipo, intervalo, solo_dias_habiles, dias_semana, dia_mes, fecha_fin } = req.body;
     
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'ID invalido' });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'ID invalido' });
+    }
     
     const ticket = await Ticket.findById(id);
     if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
     
     const esAdmin = ['admin', 'soporte'].includes(req.user.rol);
     const esCreador = ticket.usuario_id.toString() === req.user.id;
-    if (!esAdmin && !esCreador) return res.status(403).json({ error: 'No autorizado' });
+    
+    if (!esAdmin && !esCreador) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
     
     const updateOps = { es_recurrente: true };
-    if (activa !== undefined) updateOps['recurrencia.activa'] = activa === true || activa === 'true';
-    if (tipo && ['diaria', 'semanal', 'mensual', 'anual'].includes(tipo)) updateOps['recurrencia.tipo'] = tipo;
-    if (intervalo) updateOps['recurrencia.intervalo'] = parseInt(intervalo);
-    if (solo_dias_habiles !== undefined) updateOps['recurrencia.solo_dias_habiles'] = solo_dias_habiles === true || solo_dias_habiles === 'true';
+    
+    if (activa !== undefined) {
+      updateOps['recurrencia.activa'] = activa === true || activa === 'true';
+    }
+    
+    if (tipo && TIPOS_RECURRENCIA.includes(tipo)) {
+      updateOps['recurrencia.tipo'] = tipo;
+    }
+    
+    if (intervalo) {
+      updateOps['recurrencia.intervalo'] = parseInt(intervalo);
+    }
+    
+    if (solo_dias_habiles !== undefined) {
+      updateOps['recurrencia.solo_dias_habiles'] = solo_dias_habiles === true || solo_dias_habiles === 'true';
+    }
+    
     if (dias_semana) {
       try {
         const dias = typeof dias_semana === 'string' ? JSON.parse(dias_semana) : dias_semana;
-        if (!Array.isArray(dias) || !dias.every(d => [0,1,2,3,4,5,6].includes(d))) {
+        if (!Array.isArray(dias) || !dias.every(d => [0, 1, 2, 3, 4, 5, 6].includes(d))) {
           return res.status(400).json({ error: 'Dias de semana invalidos' });
         }
         updateOps['recurrencia.dias_semana'] = dias;
-      } catch (e) { return res.status(400).json({ error: 'Formato invalido para dias de semana' }); }
+      } catch (e) {
+        return res.status(400).json({ error: 'Formato invalido para dias de semana' });
+      }
     }
-    if (dia_mes) { const dia = parseInt(dia_mes); if (dia < 1 || dia > 31) return res.status(400).json({ error: 'Dia del mes invalido' }); updateOps['recurrencia.dia_mes'] = dia; }
-    if (fecha_fin) { const ff = new Date(fecha_fin); if (isNaN(ff.getTime())) return res.status(400).json({ error: 'Fecha fin invalida' }); updateOps['recurrencia.fecha_fin'] = ff; }
     
-    if (Object.keys(updateOps).length === 0) return res.status(400).json({ error: 'No se especificaron cambios' });
+    if (dia_mes) {
+      const dia = parseInt(dia_mes);
+      if (dia < 1 || dia > 31) {
+        return res.status(400).json({ error: 'Dia del mes invalido' });
+      }
+      updateOps['recurrencia.dia_mes'] = dia;
+    }
+    
+    if (fecha_fin) {
+      const ff = new Date(fecha_fin);
+      if (isNaN(ff.getTime())) {
+        return res.status(400).json({ error: 'Fecha fin invalida' });
+      }
+      updateOps['recurrencia.fecha_fin'] = ff;
+    }
+    
+    if (Object.keys(updateOps).length === 0) {
+      return res.status(400).json({ error: 'No se especificaron cambios' });
+    }
     
     updateOps.fecha_actualizacion = new Date();
     const updated = await Ticket.findByIdAndUpdate(id, { $set: updateOps }, { new: true });
@@ -733,8 +764,8 @@ exports.actualizarRecurrencia = async (req, res) => {
     
     res.json({ success: true, message: 'Configuracion de recurrencia actualizada', ticket: updated });
   } catch (error) {
-    console.error('Error al actualizar recurrencia:', error);
-    res.status(500).json({ error: 'Error al actualizar recurrencia', detalle: error.message });
+    console.error('Error al actualizar recurrencia:', error.message);
+    res.status(500).json({ error: 'Error al actualizar recurrencia' });
   }
 };
 
@@ -744,30 +775,34 @@ exports.obtenerAsignados = async (req, res) => {
     const ticket = await Ticket.findById(req.params.id).populate('asignados', 'email nombre rol');
     if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
     res.json(ticket.asignados || []);
-  } catch (error) { console.error('Error al obtener asignados:', error); res.status(500).json({ error: 'Error al obtener asignados' }); }
+  } catch (error) {
+    console.error('Error al obtener asignados:', error.message);
+    res.status(500).json({ error: 'Error al obtener asignados' });
+  }
 };
 
 exports.asignarUsuario = async (req, res) => {
   try {
     const { usuarioId } = req.body;
-    const ticket = await Ticket.findById(req.params.id).populate('usuario_id', 'email').populate('asignados', 'email nombre');
+    const ticket = await Ticket.findById(req.params.id)
+      .populate('usuario_id', 'email')
+      .populate('asignados', 'email nombre');
+    
     if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
     
     const usuario = await User.findById(usuarioId);
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
     
     if (!ticket.asignados) ticket.asignados = [];
+    
     if (ticket.asignados.some(a => (a._id || a).toString() === usuarioId)) {
       return res.status(400).json({ error: 'El usuario ya esta asignado' });
     }
     
-    if (ticket.prioridad && typeof ticket.prioridad === 'string') {
-      ticket.prioridad = ticket.prioridad.toLowerCase();
-    }
-    
     ticket.asignados.push(usuarioId);
     ticket.historial.push({
-      fecha: new Date(), estado: ticket.estado,
+      fecha: new Date(),
+      estado: ticket.estado,
       comentario: 'Usuario ' + usuario.email + ' asignado a la tarea por ' + req.user.email,
       autor: req.user.email
     });
@@ -776,31 +811,34 @@ exports.asignarUsuario = async (req, res) => {
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
     ticket.APP_URL = appUrl;
     ticket.ultimo_autor = req.user.email;
+    
     const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'asignacion');
     if (destinatarios.length) {
       await enviarCorreoTicket(ticket.toObject(), destinatarios, null, 'asignacion_usuario');
-      console.log('[ASIGNAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
     
     res.json({ success: true, message: 'Usuario ' + usuario.email + ' asignado correctamente' });
-  } catch (error) { console.error('Error al asignar usuario:', error); res.status(500).json({ error: 'Error al asignar usuario' }); }
+  } catch (error) {
+    console.error('Error al asignar usuario:', error.message);
+    res.status(500).json({ error: 'Error al asignar usuario' });
+  }
 };
 
 exports.desasignarUsuario = async (req, res) => {
   try {
     const { id, usuarioId } = req.params;
-    const ticket = await Ticket.findById(id).populate('usuario_id', 'email').populate('asignados', 'email nombre');
+    const ticket = await Ticket.findById(id)
+      .populate('usuario_id', 'email')
+      .populate('asignados', 'email nombre');
+    
     if (!ticket) return res.status(404).json({ error: 'Tarea no encontrada' });
     
     const usuario = await User.findById(usuarioId);
     
-    if (ticket.prioridad && typeof ticket.prioridad === 'string') {
-      ticket.prioridad = ticket.prioridad.toLowerCase();
-    }
-    
     ticket.asignados = (ticket.asignados || []).filter(a => (a._id || a).toString() !== usuarioId);
     ticket.historial.push({
-      fecha: new Date(), estado: ticket.estado,
+      fecha: new Date(),
+      estado: ticket.estado,
       comentario: 'Usuario ' + (usuario?.email || usuarioId) + ' desasignado de la tarea por ' + req.user.email,
       autor: req.user.email
     });
@@ -809,33 +847,32 @@ exports.desasignarUsuario = async (req, res) => {
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
     ticket.APP_URL = appUrl;
     ticket.ultimo_autor = req.user.email;
+    
     const destinatarios = await getDestinatariosNotificacion(ticket, req.user.email, 'desasignacion');
     if (destinatarios.length) {
       await enviarCorreoTicket(ticket.toObject(), destinatarios, null, 'desasignacion_usuario');
-      console.log('[DESASIGNAR] Notificacion enviada a ' + destinatarios.length + ': ' + destinatarios.join(', '));
     }
     
     res.json({ success: true, message: 'Usuario desasignado correctamente' });
-  } catch (error) { console.error('Error al desasignar usuario:', error); res.status(500).json({ error: 'Error al desasignar usuario' }); }
+  } catch (error) {
+    console.error('Error al desasignar usuario:', error.message);
+    res.status(500).json({ error: 'Error al desasignar usuario' });
+  }
 };
 
-/* OBTENER USUARIOS DISPONIBLES PARA ASIGNAR */
+/* ==================== OBTENER USUARIOS DISPONIBLES ==================== */
 exports.obtenerUsuariosDisponibles = async (req, res) => {
   try {
-    console.log('obtenerUsuariosDisponibles llamado');
-    console.log('req.user:', req.user);
+    const esAdmin = ['admin', 'soporte'].includes(req.user.rol);
     
-    const esAdmin = req.user.rol === 'admin';
-    const esSoporte = req.user.rol === 'soporte';
-    
-    if (!esAdmin && !esSoporte) {
+    if (!esAdmin) {
       return res.status(403).json({ error: 'No autorizado' });
     }
     
     const usuarios = await User.find({ activo: true }, 'email nombre rol');
     res.json(usuarios);
   } catch (error) {
-    console.error('Error al obtener usuarios:', error);
+    console.error('Error al obtener usuarios:', error.message);
     res.status(500).json({ error: 'Error al obtener usuarios' });
   }
 };

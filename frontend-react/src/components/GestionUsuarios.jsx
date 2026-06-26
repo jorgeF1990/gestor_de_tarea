@@ -37,7 +37,7 @@ export default function GestionUsuarios() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await API.get(`${API}/admin/usuarios`, {
+      const res = await API.get('/admin/usuarios', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsuarios(res.data);
@@ -59,7 +59,7 @@ export default function GestionUsuarios() {
     try {
       const token = localStorage.getItem('token');
       await API.put(
-        `${API}/admin/usuarios/${usuarioId}`,
+        `/admin/usuarios/${usuarioId}`,
         datos,
         { headers: { Authorization: `Bearer ${token}` } }
       );

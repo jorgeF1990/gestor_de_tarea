@@ -5,23 +5,9 @@ const User = require('../models/User');
 const { enviarCorreoTicket } = require('../utils/mailer');
 const { generarTicketsRecurrentes } = require('../controllers/tickets.controller');
 
-// Función para obtener destinatarios con respeto a preferencias
-const getDestinatariosConPreferencias = async (tarea, usuariosIds) => {
-  const usuarios = await User.find({ 
-    _id: { $in: usuariosIds },
-    'notificaciones.recordatorios_vencimiento': true,
-    $or: [
-      { silenciar_notificaciones_hasta: { $exists: false } },
-      { silenciar_notificaciones_hasta: null },
-      { silenciar_notificaciones_hasta: { $lt: new Date() } }
-    ]
-  });
-  
-  return usuarios.map(u => u.email).filter(Boolean);
-};
+const ESTADOS_FINALES = ['cerrado', 'resuelto', 'cancelado', 'archivado', 'archivada'];
 
-// Función para obtener TODOS los emails involucrados en una tarea
-async function getEmailsInvolucrados(ticket) {
+const getEmailsInvolucrados = async (ticket) => {
   let todosInvolucrados = [];
   
   if (ticket.usuario_id?.email) {
@@ -50,20 +36,36 @@ async function getEmailsInvolucrados(ticket) {
   todosInvolucrados.push('envios@portfolioinvestment.com.ar');
   
   return [...new Set(todosInvolucrados.filter(Boolean))];
-}
+};
 
-// Función principal: revisar tareas para notificaciones de vencimiento
+const getDescripcionRecordatorio = (tipo, dias) => {
+  const descripciones = {
+    '30_dias': 'Esta tarea vence en 30 dias. Te recomendamos planificar su ejecucion.',
+    '21_dias': 'Esta tarea vence en 3 semanas.',
+    '14_dias': 'Esta tarea vence en 2 semanas.',
+    '7_dias': 'IMPORTANTE: Esta tarea vence en 7 dias.',
+    '3_dias': 'URGENTE: Esta tarea vence en 3 dias.',
+    '1_dia': 'ATENCION: Esta tarea vence MAÑANA.',
+    'hoy': 'URGENTE: Esta tarea vence HOY.',
+    'vencida_1': 'Esta tarea vencio. Por favor, actualiza su estado.',
+    'vencida_3': 'Esta tarea vencio hace varios dias. Requiere atencion.',
+    'vencida_7': 'Esta tarea vencio hace 1 semana. Por favor, resuelvela.',
+    'vencida_14': 'Esta tarea vencio hace 2 semanas. Necesita atencion urgente.',
+    'vencida_30': 'Esta tarea vencio hace 1 MES. Por favor, toma accion inmediata.'
+  };
+  return descripciones[tipo] || 'Recordatorio de vencimiento';
+};
+
 const revisarTareasVencimiento = async () => {
-  console.log(`[${new Date().toISOString()}] 🔔 Iniciando revisión de tareas para vencimiento...`);
+  console.log(`[${new Date().toISOString()}] Iniciando revision de tareas para vencimiento...`);
   
-  // VERIFICAR CONEXIÓN A MONGODB ANTES DE CONTINUAR
   if (mongoose.connection.readyState !== 1) {
-    console.warn('⚠️ MongoDB no está conectado. Intentando reconectar...');
+    console.warn('MongoDB no esta conectado. Intentando reconectar...');
     try {
-      await mongoose.connect(process.env.MONGO_URI);
-      console.log('✅ MongoDB reconectado para el scheduler');
+      await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI);
+      console.log('MongoDB reconectado para el scheduler');
     } catch (e) {
-      console.error('❌ No se pudo reconectar a MongoDB, abortando revisión');
+      console.error('No se pudo reconectar a MongoDB, abortando revision');
       return;
     }
   }
@@ -73,7 +75,7 @@ const revisarTareasVencimiento = async () => {
     hoy.setHours(0, 0, 0, 0);
     
     const tareasAVencer = await Ticket.find({
-      estado: { $nin: ['cerrado', 'resuelto', 'cancelado', 'archivado', 'archivada'] },
+      estado: { $nin: ESTADOS_FINALES },
       fecha_vencimiento: { $exists: true, $ne: null },
       notificaciones_habilitadas: true,
       $or: [
@@ -89,7 +91,7 @@ const revisarTareasVencimiento = async () => {
       return;
     }
     
-    console.log(`📊 ${tareasAVencer.length} tareas para evaluar`);
+    console.log(`${tareasAVencer.length} tareas para evaluar`);
     let notificacionesEnviadas = 0;
     
     for (const tarea of tareasAVencer) {
@@ -126,7 +128,7 @@ const revisarTareasVencimiento = async () => {
         }
       }
       
-      if (esVencida && !['cerrado', 'resuelto', 'archivado', 'archivada'].includes(tarea.estado)) {
+      if (esVencida && !ESTADOS_FINALES.includes(tarea.estado)) {
         if (diasVencida >= 1 && diasVencida <= 2 && diasDesdeUltimaNotif > 1) {
           tipoNotificacion = 'vencida_1'; debeNotificar = true;
         } else if (diasVencida >= 3 && diasVencida <= 5 && diasDesdeUltimaNotif > 3) {
@@ -145,7 +147,7 @@ const revisarTareasVencimiento = async () => {
           const destinatarios = await getEmailsInvolucrados(tarea);
           
           if (destinatarios.length > 0) {
-            const appUrl = process.env.APP_URL || 'http://localhost:3000';
+            const appUrl = process.env.APP_URL || 'https://tareasync.vercel.app';
             const emailData = {
               ...tarea.toObject(),
               APP_URL: appUrl,
@@ -163,70 +165,52 @@ const revisarTareasVencimiento = async () => {
             );
             
             notificacionesEnviadas++;
-            console.log(`📧 Recordatorio enviado: #${tarea.numero_ticket} (${tipoNotificacion}) - ${diasHastaVencimiento} días - Destinatarios: ${destinatarios.length}`);
+            console.log(`Recordatorio enviado: #${tarea.numero_ticket} (${tipoNotificacion}) - ${diasHastaVencimiento} dias - Destinatarios: ${destinatarios.length}`);
           }
         } catch (mailError) {
-          console.error(`❌ Error enviando recordatorio para #${tarea.numero_ticket}:`, mailError.message);
+          console.error(`Error enviando recordatorio para #${tarea.numero_ticket}:`, mailError.message);
         }
       }
     }
     
-    console.log(`✅ Revisión completada. Notificaciones enviadas: ${notificacionesEnviadas}`);
+    console.log(`Revision completada. Notificaciones enviadas: ${notificacionesEnviadas}`);
     
   } catch (err) {
-    console.error('❌ Error en revisión programada de tareas:', err.message);
+    console.error('Error en revision programada de tareas:', err.message);
   }
 };
 
-function getDescripcionRecordatorio(tipo, dias) {
-  const descripciones = {
-    '30_dias': 'Esta tarea vence en 30 días. Te recomendamos planificar su ejecución.',
-    '21_dias': 'Esta tarea vence en 3 semanas.',
-    '14_dias': 'Esta tarea vence en 2 semanas.',
-    '7_dias': 'IMPORTANTE: Esta tarea vence en 7 días.',
-    '3_dias': 'URGENTE: Esta tarea vence en 3 días.',
-    '1_dia': 'ATENCIÓN: Esta tarea vence MAÑANA.',
-    'hoy': 'URGENTE: Esta tarea vence HOY.',
-    'vencida_1': 'Esta tarea venció. Por favor, actualiza su estado.',
-    'vencida_3': 'Esta tarea venció hace varios días. Requiere atención.',
-    'vencida_7': 'Esta tarea venció hace 1 semana. Por favor, resuélvela.',
-    'vencida_14': 'Esta tarea venció hace 2 semanas. Necesita atención urgente.',
-    'vencida_30': 'Esta tarea venció hace 1 MES. Por favor, toma acción inmediata.'
-  };
-  return descripciones[tipo] || `Recordatorio de vencimiento`;
-}
-
 const startScheduler = () => {
-    console.log('🚀 Ejecutando revisión inicial de vencimientos...');
-    revisarTareasVencimiento().catch(err => console.error('Error en revisión inicial:', err));
-    
-    cron.schedule('40 9 * * *', async () => {
-        console.log('CRON JOB (09:40): Ejecutando revisión de vencimientos...');
-        await revisarTareasVencimiento();
-    }, { timezone: "America/Buenos_Aires" });
-    
-    cron.schedule('10 10 * * *', async () => {
-        console.log('CRON JOB (10:10): Generando tickets recurrentes...');
-        try {
-            if (mongoose.connection.readyState !== 1) {
-                await mongoose.connect(process.env.MONGO_URI);
-            }
-            const resultado = await generarTicketsRecurrentes();
-            console.log(`Resultado recurrencia: ${resultado.generados} tickets generados de ${resultado.revisados} revisados`);
-        } catch (error) {
-            console.error('Error en generación recurrente:', error.message);
-        }
-    }, { timezone: "America/Buenos_Aires" });
-    
-    cron.schedule('0 18 * * *', async () => {
-        console.log('CRON JOB (18:00): Ejecutando revisión de vencimientos...');
-        await revisarTareasVencimiento();
-    }, { timezone: "America/Buenos_Aires" });
+  console.log('Ejecutando revision inicial de vencimientos...');
+  revisarTareasVencimiento().catch(err => console.error('Error en revision inicial:', err));
+  
+  cron.schedule('40 9 * * *', async () => {
+    console.log('CRON JOB (09:40): Ejecutando revision de vencimientos...');
+    await revisarTareasVencimiento();
+  }, { timezone: "America/Buenos_Aires" });
+  
+  cron.schedule('10 10 * * *', async () => {
+    console.log('CRON JOB (10:10): Generando tickets recurrentes...');
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI);
+      }
+      const resultado = await generarTicketsRecurrentes();
+      console.log(`Resultado recurrencia: ${resultado.generados} tickets generados de ${resultado.revisados} revisados`);
+    } catch (error) {
+      console.error('Error en generacion recurrente:', error.message);
+    }
+  }, { timezone: "America/Buenos_Aires" });
+  
+  cron.schedule('0 18 * * *', async () => {
+    console.log('CRON JOB (18:00): Ejecutando revision de vencimientos...');
+    await revisarTareasVencimiento();
+  }, { timezone: "America/Buenos_Aires" });
 
-    console.log('✅ Scheduler de notificaciones y recurrencia iniciado.');
-    console.log('   📅 09:40 y 18:00 → Revisión de vencimientos');
-    console.log('   🔄 10:10 → Generación de tickets recurrentes');
-    console.log('   ⚡ Ejecución inicial al arrancar el servidor');
+  console.log('Scheduler de notificaciones y recurrencia iniciado.');
+  console.log('  09:40 y 18:00 -> Revision de vencimientos');
+  console.log('  10:10 -> Generacion de tickets recurrentes');
+  console.log('  Ejecucion inicial al arrancar el servidor');
 };
 
 module.exports = { startScheduler, revisarTareasVencimiento };

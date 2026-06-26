@@ -3,12 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../api';
 import './TareaDetail.css';
 
-// Importar iconos profesionales de Lucide React (mismos que el Dashboard)
+// Importar iconos profesionales de Lucide React
 import {
   Calendar,
   Clock,
   User,
-  Mail,
   AlertCircle,
   CheckCircle,
   XCircle,
@@ -19,57 +18,25 @@ import {
   FolderOpen,
   Archive,
   BellOff,
-  BellRing,
   Share2,
   Copy,
   ArrowLeft,
   Check,
   Loader2,
   Inbox,
-  Package,
   AlertTriangle,
   TrendingUp,
   Flag,
   MessageSquare,
   Image,
-  ChevronRight,
-  ChevronDown,
-  Save,
-  Edit,
-  Upload,
-  X,
-  Info,
-  Link2,
-  ExternalLink,
   CalendarDays,
   CalendarClock,
   Clock3,
-  UserCheck,
-  UserX,
-  Shield,
-  ShieldCheck,
-  ShieldAlert,
-  Eye,
-  EyeOff,
-  ThumbsUp,
-  ThumbsDown,
-  Star,
-  Heart,
-  Bookmark,
-  BookOpen,
-  FileText,
-  FileCheck,
-  FileX,
-  Folder,
-  FolderArchive,
-  Send,
-  Reply,
-  MoreVertical,
-  MoreHorizontal,
   Settings,
-  HelpCircle,
   LogOut,
-  RefreshCw
+  FileText,
+  RefreshCw,
+  Info
 } from 'lucide-react';
 
 const BRAND_NAME = 'TareaSync';
@@ -90,7 +57,7 @@ export default function TareaDetail() {
     cargarTarea();
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('silenciado') === 'exito') {
-      setMensajeSilencio('✅ Notificaciones silenciadas correctamente por 30 días');
+      setMensajeSilencio('Notificaciones silenciadas correctamente por 30 días');
       setTimeout(() => setMensajeSilencio(null), 5000);
     }
   }, [id]);
@@ -106,7 +73,7 @@ export default function TareaDetail() {
         return;
       }
       
-      const res = await API.get(`${API}/tickets/${id}`, {
+      const res = await API.get(`/tickets/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -139,18 +106,18 @@ export default function TareaDetail() {
       }
       
       await API.post(
-        `${API}/tickets/${id}/silenciar`,
+        `/tickets/${id}/silenciar`,
         { dias: 30 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      setMensajeSilencio('✅ Notificaciones silenciadas por 30 días');
+      setMensajeSilencio('Notificaciones silenciadas por 30 días');
       setTimeout(() => setMensajeSilencio(null), 5000);
       
       cargarTarea();
     } catch (err) {
       console.error('Error al silenciar:', err);
-      setMensajeSilencio('❌ Error al silenciar notificaciones');
+      setMensajeSilencio('Error al silenciar notificaciones');
       setTimeout(() => setMensajeSilencio(null), 5000);
     } finally {
       setSilenciando(false);
@@ -485,8 +452,8 @@ export default function TareaDetail() {
 
           {/* Mensajes */}
           {mensajeSilencio && (
-            <div className={`toast-message ${mensajeSilencio.includes('✅') ? 'success' : 'error'}`}>
-              {mensajeSilencio.includes('✅') ? <CheckCircle size={18} /> : <XCircle size={18} />}
+            <div className={`toast-message ${mensajeSilencio.includes('Error') ? 'error' : 'success'}`}>
+              {mensajeSilencio.includes('Error') ? <XCircle size={18} /> : <CheckCircle size={18} />}
               {mensajeSilencio}
             </div>
           )}

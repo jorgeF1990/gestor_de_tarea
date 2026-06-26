@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 
 const estadoOps = ['abierto', 'pendiente', 'en_proceso', 'resuelto', 'cerrado', 'reabierto', 'cancelado', 'archivado'];
-const prioOps = ['baja', 'media', 'alta'];
+const prioOps = ['baja', 'media', 'alta', 'urgente'];
 
 const getActivityTs = (t) => {
   const created = t.createdAt || t.fecha_creacion;

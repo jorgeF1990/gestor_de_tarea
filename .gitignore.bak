@@ -2,19 +2,24 @@
 # DEPENDENCIAS
 # =========================
 node_modules/
+backend/node_modules/
 frontend-react/node_modules/
 
 # =========================
 # VARIABLES DE ENTORNO (CREDENCIALES)
 # =========================
 .env
+backend/.env
 frontend-react/.env
+backend/.env.local
+backend/.env.production
 frontend-react/.env.local
 frontend-react/.env.production
 
 # =========================
 # ARCHIVOS SUBIDOS (IMÁGENES, ADJUNTOS)
 # =========================
+backend/uploads/
 uploads/
 
 # =========================
@@ -24,6 +29,7 @@ dist/
 build/
 dist-ssr
 .vite/
+backend/dist/
 frontend-react/dist/
 
 # =========================

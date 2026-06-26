@@ -1,6 +1,6 @@
 console.log('=== VERCEL SERVERLESS START ===');
 
-// FORZAR VARIABLES DE ENTORNO
+// Forzar variables de entorno
 const MONGODB_URI = 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
 if (!process.env.MONGODB_URI) process.env.MONGODB_URI = MONGODB_URI;
 if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'clave_secreta_para_jwt_vercel_2026';
@@ -8,8 +8,8 @@ process.env.NODE_ENV = 'production';
 process.env.VERCEL = '1';
 
 try {
-  // Cargar backend desde la copia local
-  const app = require('./backend/app.js');
+  // Cargar backend desde la raíz
+  const app = require('../backend/app.js');
   console.log('[BACKEND] ✅ App cargada correctamente');
   module.exports = app;
 } catch (err) {

@@ -1,10 +1,12 @@
 // backend/routes/ticket.routes.js
 const express = require('express');
+const router = express.Router();
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const rootPath = require('app-root-path');
 
-const auth = require('../middlewares/auth');
+const auth = require(`${rootPath.path}/backend/middlewares/auth`);
 
 const {
   crearTicket,

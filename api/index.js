@@ -1,12 +1,17 @@
 // api/index.js
-console.log('[VERCEL] Iniciando función serverless');
+console.log('[VERCEL] Iniciando funcion serverless');
 
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const rootPath = require('app-root-path');
+
+// Root path para resolver rutas relativas
+global.__root = rootPath.path;
+console.log('[VERCEL] Root path:', __root);
 
 // ============================================================
-// CONFIGURACIÓN - VARIABLES DE ENTORNO
+// CONFIGURACION - VARIABLES DE ENTORNO
 // ============================================================
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -157,13 +162,13 @@ app.get('/ping-db', async (req, res) => {
 });
 
 // ============================================================
-// RUTAS - IMPORTAR DESDE BACKEND
+// RUTAS - IMPORTAR DESDE BACKEND USANDO ROOT PATH
 // ============================================================
 try {
-  const authRoutes = require('../backend/routes/auth.routes');
-  const ticketRoutes = require('../backend/routes/ticket.routes');
-  const adminRoutes = require('../backend/routes/admin.routes');
-  const calendarRoutes = require('../backend/routes/calendar.routes');
+  const authRoutes = require(`${__root}/backend/routes/auth.routes`);
+  const ticketRoutes = require(`${__root}/backend/routes/ticket.routes`);
+  const adminRoutes = require(`${__root}/backend/routes/admin.routes`);
+  const calendarRoutes = require(`${__root}/backend/routes/calendar.routes`);
 
   app.use('/auth', ensureConnection, authRoutes);
   app.use('/tickets', ensureConnection, ticketRoutes);
@@ -174,7 +179,7 @@ try {
 } catch (error) {
   console.error('[VERCEL] Error cargando rutas:', error.message);
   
-  // Fallback para rutas básicas
+  // Fallback para rutas basicas
   app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'API running in fallback mode' });
   });

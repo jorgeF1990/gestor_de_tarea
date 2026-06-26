@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middlewares/auth');
-const User = require('../models/User');
-const { generarTicketsRecurrentes } = require('../controllers/tickets.controller');
+const rootPath = require('app-root-path');
+
+const auth = require(`${rootPath.path}/backend/middlewares/auth`);
+const User = require(`${rootPath.path}/backend/models/User`);
+const { generarTicketsRecurrentes } = require(`${rootPath.path}/backend/controllers/tickets.controller`);
 
 // Todas las rutas requieren autenticación y rol admin
 router.use(auth);

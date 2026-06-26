@@ -80,5 +80,8 @@
       "src": "/(.*)",
       "dest": "frontend-react/dist/$1"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

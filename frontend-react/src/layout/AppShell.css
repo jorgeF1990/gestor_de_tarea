@@ -4,176 +4,261 @@
   --sidebar-bg: #ffffff;
   --sidebar-text: #111827;
   --border-color: #e5e7eb;
+  --card-bg: #ffffff;
+  --muted-text: #4b5563;
+  --brand-color: #4f46e5;
+  --brand-hover: #4338ca;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --radius: 12px;
+  --sidebar-width: 220px;
+  --sidebar-collapsed: 70px;
+  --header-height: 64px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme="dark"] {
-  --bg-color: #111827;
-  --text-color: #f3f4f6;
-  --sidebar-bg: #1f2937;
-  --sidebar-text: #f9fafb;
+  --bg-color: #0f172a;
+  --text-color: #e5e7eb;
+  --sidebar-bg: #111827;
+  --sidebar-text: #e5e7eb;
   --border-color: #374151;
+  --card-bg: #1e293b;
+  --muted-text: #9ca3af;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .appshell {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
-  background-color: var(--bg-color);
+  min-height: 100vh;
+  background: var(--bg-color);
   color: var(--text-color);
-  transition: background-color 0.3s, color 0.3s;
+  transition: background var(--transition), color var(--transition);
 }
 
-/* Sidebar */
+/* ===== SIDEBAR ===== */
 .appshell-sidebar-wrap {
-  height: 100%;
-  background-color: var(--sidebar-bg);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+  background: var(--sidebar-bg);
   color: var(--sidebar-text);
   border-right: 1px solid var(--border-color);
-  transition: width 0.3s ease, background-color 0.3s, color 0.3s;
+  transition: width var(--transition), transform var(--transition), background var(--transition);
+  overflow: hidden;
 }
 
 .appshell--closed .appshell-sidebar-wrap {
-  width: 70px;
+  width: var(--sidebar-collapsed);
 }
 
 .appshell--open .appshell-sidebar-wrap {
-  width: 220px;
+  width: var(--sidebar-width);
 }
 
-/* Contenido principal */
+/* ===== CONTENIDO PRINCIPAL ===== */
 .appshell-content {
   flex: 1;
+  margin-left: var(--sidebar-collapsed);
   display: flex;
   flex-direction: column;
-  transition: margin-left 0.3s ease;
+  min-height: 100vh;
+  transition: margin-left var(--transition);
 }
 
-/* Botón para cambiar tema */
-.appshell-theme-toggle {
+.appshell--open .appshell-content {
+  margin-left: var(--sidebar-width);
+}
+
+/* ===== HEADER ===== */
+.appshell-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
-  justify-content: flex-end;
-  padding: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: var(--header-height);
+  background: var(--bg-color);
   border-bottom: 1px solid var(--border-color);
+  transition: background var(--transition), border-color var(--transition);
 }
 
-.theme-btn {
-  background-color: transparent;
+.appshell-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.appshell-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ===== BOTÓN DE MENÚ ===== */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-color);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.menu-toggle:hover {
+  background: var(--border-color);
+}
+
+/* ===== BOTÓN DE TEMA ===== */
+.theme-toggle {
+  background: none;
   border: 1px solid var(--border-color);
   color: var(--text-color);
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.3s, color 0.3s;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
 }
 
-.theme-btn:hover {
-  background-color: var(--text-color);
-  color: var(--bg-color);
+.theme-toggle:hover {
+  background: var(--border-color);
 }
 
-/* Contenedor interior */
+/* ===== CONTENEDOR INTERIOR ===== */
 .appshell-inner {
-  padding: 1.5rem;
+  padding: 24px;
   flex: 1;
   overflow-y: auto;
-  transition: background-color 0.3s, color 0.3s;
 }
 
-/* Responsive (móvil) */
+/* ===== OVERLAY PARA MÓVIL ===== */
+.appshell-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 90;
+  backdrop-filter: blur(2px);
+}
+
+.appshell--open .appshell-overlay {
+  display: block;
+}
+
+/* ============================================================ */
+/* RESPONSIVE */
+/* ============================================================ */
+
+/* Tablets y móviles */
 @media (max-width: 768px) {
-  .appshell {
-    flex-direction: column;
+  .menu-toggle {
+    display: flex;
   }
 
   .appshell-sidebar-wrap {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100%;
-    z-index: 999;
     transform: translateX(-100%);
-    transition: transform 0.3s ease, background-color 0.3s, color 0.3s;
+    width: var(--sidebar-width) !important;
   }
 
   .appshell--open .appshell-sidebar-wrap {
     transform: translateX(0);
   }
 
+  .appshell--open .appshell-overlay {
+    display: block;
+  }
+
   .appshell-content {
     margin-left: 0 !important;
   }
-}
-:root {
-  /* Ya definidas */
-  --bg-color: #f9fafb;
-  --text-color: #111827;
-  --sidebar-bg: #ffffff;
-  --sidebar-text: #111827;
-  --border-color: #e5e7eb;
 
-  /* NUEVO: tokens UI */
-  --card-bg: #ffffff;
-  --muted-text: #4b5563;
+  .appshell-header {
+    padding: 0 16px;
+  }
 
-  /* Botones base */
-  --btn-bg: #111827;
-  --btn-text: #ffffff;
-  --btn-border: #111827;
-  --btn-hover-bg: #0b1220;
-
-  /* Botón secundario */
-  --btn2-bg: #ffffff;
-  --btn2-text: #111827;
-  --btn2-border: #d1d5db;
-  --btn2-hover-bg: #f3f4f6;
-
-  /* Botón ghost */
-  --btn-ghost-text: var(--text-color);
-  --btn-ghost-hover-bg: rgba(0,0,0,.06);
-
-  /* Campos */
-  --input-bg: #ffffff;
-  --input-text: #111827;
-  --input-border: #d1d5db;
-  --input-placeholder: #9ca3af;
-
-  /* Links */
-  --link: #2563eb;
-  --link-hover: #1d4ed8;
+  .appshell-inner {
+    padding: 16px;
+  }
 }
 
-[data-theme="dark"] {
-  --bg-color: #0f172a;         /* pizarra */
-  --text-color: #e5e7eb;
-  --sidebar-bg: #111827;
-  --sidebar-text: #e5e7eb;
-  --border-color: #374151;
+/* Móviles pequeños */
+@media (max-width: 480px) {
+  .appshell-header {
+    padding: 0 12px;
+    height: 56px;
+  }
 
-  --card-bg: #0b1220;
-  --muted-text: #9ca3af;
+  .appshell-header-right .theme-toggle span {
+    display: none;
+  }
 
-  --btn-bg: #e5e7eb;
-  --btn-text: #0f172a;
-  --btn-border: #e5e7eb;
-  --btn-hover-bg: #cfd3da;
+  .appshell-inner {
+    padding: 12px;
+  }
 
-  --btn2-bg: #111827;
-  --btn2-text: #e5e7eb;
-  --btn2-border: #30363d;
-  --btn2-hover-bg: #1b2433;
-
-  --btn-ghost-text: #e5e7eb;
-  --btn-ghost-hover-bg: rgba(255,255,255,.08);
-
-  --input-bg: #111827;
-  --input-text: #e5e7eb;
-  --input-border: #374151;
-  --input-placeholder: #9ca3af;
-
-  --link: #93c5fd;
-  --link-hover: #bfdbfe;
+  .appshell-sidebar-wrap {
+    width: 280px !important;
+  }
 }
-.appshell { background: var(--bg-color); color: var(--text-color); }
-.appshell-content { background: var(--bg-color); color: var(--text-color); }
-.appshell-inner { background: var(--bg-color); color: var(--text-color); }
-.appshell-sidebar-wrap { background: var(--sidebar-bg); color: var(--sidebar-text); border-right: 1px solid var(--border-color); }
+
+/* ============================================================ */
+/* ANIMACIONES */
+/* ============================================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.appshell-inner {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ============================================================ */
+/* LOADING */
+/* ============================================================ */
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 16px;
+}
+
+.loader {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--brand-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

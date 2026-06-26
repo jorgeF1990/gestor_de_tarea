@@ -10,19 +10,54 @@ import RecurrenciaConfig from '../components/RecurrenciaConfig';
 
 // Importar iconos profesionales de Lucide React
 import {
-  LayoutList, KanbanSquare, Archive, ArchiveRestore, RefreshCw, Bell,
-  Clock, AlertCircle, Calendar, Flag, User, Users, MessageSquare, Image,
-  ChevronDown, ChevronRight, CheckCircle, XCircle, PlayCircle, PauseCircle,
-  RotateCcw, Lock, FolderOpen, Save, Upload, Edit, Search, Sun, Moon,
-  Loader2, Inbox, Package, Layers, AlertTriangle, TrendingUp, X, Check, Info, CalendarDays
+  LayoutList,
+  KanbanSquare,
+  Archive,
+  ArchiveRestore,
+  RefreshCw,
+  Bell,
+  Clock,
+  AlertCircle,
+  Calendar,
+  Flag,
+  User,
+  Users,
+  MessageSquare,
+  Image,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  PlayCircle,
+  PauseCircle,
+  RotateCcw,
+  Lock,
+  FolderOpen,
+  Save,
+  Upload,
+  Edit,
+  Search,
+  Sun,
+  Moon,
+  Loader2,
+  Inbox,
+  Package,
+  Layers,
+  AlertTriangle,
+  TrendingUp,
+  X,
+  Check,
+  Info,
+  CalendarDays
 } from 'lucide-react';
 
+// Constantes
 const SEEN_KEY_ADMIN = 'dashboard_last_seen:v1';
 const OPEN_KEY_ADMIN = 'dashboard_open_cards:v1';
 const THEME_KEY = 'dashboard-theme';
 const VIEW_MODE_KEY = 'dashboard_view_mode:v1';
 
-// Helpers ============================================================
+// Helpers
 const getActivityTs = (t) => {
   const times = [
     t.fecha_creacion || t.createdAt ? new Date(t.fecha_creacion || t.createdAt).getTime() : 0,
@@ -82,7 +117,7 @@ const colorEstado = {
 };
 
 function Dashboard() {
-  // Estados ============================================================
+  // Estados
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mensajes, setMensajes] = useState({});
@@ -113,6 +148,7 @@ function Dashboard() {
   const audioRef = useRef(null);
   const navigate = useNavigate();
 
+  // Funciones auxiliares
   const showToast = useCallback((msg, type = 'info', ttl = 3200) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setToasts(prev => [...prev, { id, msg, type }]);
@@ -122,13 +158,14 @@ function Dashboard() {
         audioRef.current.volume = 0.28;
       }
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => { });
-    } catch { }
+      audioRef.current.play().catch(() => {});
+    } catch {}
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ttl);
   }, []);
 
   const toggleTheme = useCallback(() => setTheme(prev => prev === 'dark' ? 'light' : 'dark'), []);
 
+  // Efectos
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
@@ -143,7 +180,7 @@ function Dashboard() {
     setPage(1);
   }, [pageSize]);
 
-  // Autenticación y carga inicial =======================================================
+  // Autenticación
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { navigate('/login'); return; }
@@ -155,7 +192,7 @@ function Dashboard() {
     try {
       const raw = localStorage.getItem(OPEN_KEY_ADMIN);
       if (raw) setAbiertos(JSON.parse(raw) || {});
-    } catch { }
+    } catch {}
     cargarTickets();
   }, [navigate]);
 
@@ -166,10 +203,10 @@ function Dashboard() {
   }, [autoRefresh]);
 
   useEffect(() => {
-    try { localStorage.setItem(OPEN_KEY_ADMIN, JSON.stringify(abiertos)); } catch { }
+    try { localStorage.setItem(OPEN_KEY_ADMIN, JSON.stringify(abiertos)); } catch {}
   }, [abiertos]);
 
-  // CRUD Tickets =======================================================
+  // CRUD
   const cargarTickets = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     const token = localStorage.getItem('token');
@@ -190,7 +227,7 @@ function Dashboard() {
       });
       calcularNovedades(ordenados);
     } catch (err) {
-      console.error(err);
+      console.error('[Dashboard] Error cargando tickets:', err);
       setTickets([]);
     } finally {
       if (!silent) setLoading(false);
@@ -202,14 +239,7 @@ function Dashboard() {
     let cambio = cambios[id] || {};
     if (datos) cambio = { ...cambio, ...datos };
 
-    const { 
-      nuevoEstado, 
-      nuevaPrioridad, 
-      nuevaFecha, 
-      nuevaHora, 
-      recurrenciaConfig 
-    } = cambio;
-    
+    const { nuevoEstado, nuevaPrioridad, nuevaFecha, nuevaHora, recurrenciaConfig } = cambio;
     const ticketActual = tickets.find(t => t._id === id);
     let fechaCompleta = null;
 
@@ -228,7 +258,6 @@ function Dashboard() {
 
     const hayRecurrencia = recurrenciaConfig?.es_recurrente !== undefined;
     const hayEstado = !!nuevoEstado || !!nuevaPrioridad || !!fechaCompleta;
-    
     if (!hayEstado && !hayRecurrencia) return { ok: false };
 
     const payload = {};
@@ -236,24 +265,19 @@ function Dashboard() {
     if (nuevaPrioridad) payload.prioridad = nuevaPrioridad;
     if (fechaCompleta) payload.fecha_vencimiento = fechaCompleta;
 
-    // ========== AGREGAR DATOS DE RECURRENCIA AL PAYLOAD ==========
     if (recurrenciaConfig) {
       payload.es_recurrente = recurrenciaConfig.es_recurrente;
-      
       if (recurrenciaConfig.es_recurrente && recurrenciaConfig.recurrencia) {
         const rec = recurrenciaConfig.recurrencia;
         payload.recurrencia_tipo = rec.tipo;
         payload.recurrencia_intervalo = rec.intervalo || 1;
         payload.solo_dias_habiles = rec.solo_dias_habiles !== false;
-        
         if (rec.tipo === 'semanal' && rec.dias_semana) {
           payload.dias_semana = JSON.stringify(rec.dias_semana);
         }
-        
         if (rec.tipo === 'mensual' && rec.dia_mes) {
           payload.dia_mes = rec.dia_mes;
         }
-        
         if (rec.fecha_fin) {
           payload.fecha_fin_recurrencia = rec.fecha_fin;
         }
@@ -265,13 +289,10 @@ function Dashboard() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
 
-      // Actualizar estado local
       setTickets(prev => prev.map(t => {
         if (t._id === id) {
           const updated = { ...t, ...payload, fecha_actualizacion: new Date().toISOString() };
           if (fechaCompleta) updated.fecha_vencimiento = fechaCompleta;
-          
-          // Actualizar recurrencia en el objeto local
           if (recurrenciaConfig) {
             updated.es_recurrente = recurrenciaConfig.es_recurrente;
             if (recurrenciaConfig.recurrencia) {
@@ -284,13 +305,11 @@ function Dashboard() {
               updated.recurrencia = { ...t.recurrencia, activa: false };
             }
           }
-          
           return updated;
         }
         return t;
       }));
 
-      // Limpiar cambios del formulario
       setCambios(prev => {
         const n = { ...prev };
         if (n[id]) {
@@ -307,7 +326,7 @@ function Dashboard() {
       await cargarTickets({ silent: true });
       return { ok: true };
     } catch (err) {
-      console.error('Error al actualizar ticket:', err);
+      console.error('[Dashboard] Error al actualizar ticket:', err);
       showToast('Error al actualizar: ' + (err.response?.data?.mensaje || err.message), 'error');
       return { ok: false };
     }
@@ -318,7 +337,7 @@ function Dashboard() {
     const cambio = cambios[id] || {};
     const { nuevoComentario, nuevoArchivo } = cambio;
     if (!nuevoComentario && !nuevoArchivo) {
-      setMensajes(prev => ({ ...prev, [id]: '⚠️ Comentario vacío' }));
+      setMensajes(prev => ({ ...prev, [id]: 'Comentario vacio' }));
       return { ok: false };
     }
     const formData = new FormData();
@@ -336,12 +355,12 @@ function Dashboard() {
         }
         return n;
       });
-      setMensajes(prev => ({ ...prev, [id]: '✅ Comentario guardado' }));
+      setMensajes(prev => ({ ...prev, [id]: 'Comentario guardado' }));
       showToast('Comentario agregado', 'success');
       await cargarTickets({ silent: true });
       return { ok: true };
     } catch (err) {
-      setMensajes(prev => ({ ...prev, [id]: '❌ Error' }));
+      setMensajes(prev => ({ ...prev, [id]: 'Error al guardar' }));
       showToast('Error al comentar', 'error');
       return { ok: false };
     }
@@ -352,15 +371,12 @@ function Dashboard() {
   };
 
   const onCambioRecurrencia = (id, recurrenciaConfig) => {
-    setCambios(prev => ({ 
-      ...prev, 
-      [id]: { 
-        ...prev[id], 
-        recurrenciaConfig,
-        // Si activa recurrencia, asegurar que tenga tipo
-        recurrencia_tipo: recurrenciaConfig.es_recurrente ? 
-          (recurrenciaConfig.recurrencia?.tipo || 'diaria') : undefined
-      } 
+    setCambios(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        recurrenciaConfig
+      }
     }));
   };
 
@@ -370,25 +386,18 @@ function Dashboard() {
     const hayEstado = !!cambio.nuevoEstado || !!cambio.nuevaPrioridad || !!cambio.nuevaFecha || !!cambio.nuevaHora;
     const hayComentario = !!cambio.nuevoComentario || !!cambio.nuevoArchivo;
     const hayRecurrencia = cambio.recurrenciaConfig !== undefined;
-    
     if (!hayEstado && !hayComentario && !hayRecurrencia) {
-      setMensajes(prev => ({ ...prev, [id]: '⚠️ No hay cambios para guardar' }));
+      setMensajes(prev => ({ ...prev, [id]: 'No hay cambios' }));
       return;
     }
-    
     setSaving(prev => ({ ...prev, [id]: true }));
     setMensajes(prev => ({ ...prev, [id]: '' }));
-    
-    // Primero guardar estado/recurrencia
     if (hayEstado || hayRecurrencia) {
       await actualizarTicket(id);
     }
-    
-    // Luego guardar comentario
     if (hayComentario) {
       await agregarComentario(id);
     }
-    
     setSaving(prev => ({ ...prev, [id]: false }));
   };
 
@@ -401,7 +410,7 @@ function Dashboard() {
     }
   };
 
-  // Drag & Drop =======================================================
+  // Drag & Drop
   const handleDragStart = (e, ticket) => {
     setDraggedTicket(ticket);
     e.dataTransfer.effectAllowed = 'move';
@@ -416,7 +425,7 @@ function Dashboard() {
     setDraggedTicket(null);
   };
 
-  // UI Helpers =======================================================
+  // UI Helpers
   const setOpenAndFocus = (id, open = true) => {
     setAbiertos(prev => ({ ...prev, [id]: open }));
     if (open) {
@@ -442,12 +451,12 @@ function Dashboard() {
     return new Date(ticket.fecha_vencimiento) < new Date();
   };
 
-  // Novedades =======================================================
+  // Novedades
   const getSeen = () => {
     try { return JSON.parse(localStorage.getItem(SEEN_KEY_ADMIN) || '{}'); } catch { return {}; }
   };
   const setSeen = (snap) => {
-    try { localStorage.setItem(SEEN_KEY_ADMIN, JSON.stringify(snap)); } catch { }
+    try { localStorage.setItem(SEEN_KEY_ADMIN, JSON.stringify(snap)); } catch {}
   };
 
   const buildSnap = (list) => {
@@ -514,7 +523,7 @@ function Dashboard() {
     setNewsCount(prev => Math.max(0, prev - 1));
   };
 
-  // Filtrado =======================================================
+  // Filtrado
   const filteredTickets = useMemo(() => {
     let base = tickets;
     if (viewMode === 'archivadas') base = tickets.filter(t => t.estado === 'archivado');
@@ -581,7 +590,7 @@ function Dashboard() {
     showToast('Filtros limpiados', 'info');
   };
 
-  // Render Kanban Card =======================================================
+  // Render Kanban Card
   const renderKanbanCard = (ticket) => {
     const vencida = isVencida(ticket);
     const tieneNovedad = changesMap[ticket._id] && Object.values(changesMap[ticket._id]).some(v => v);
@@ -611,7 +620,7 @@ function Dashboard() {
     );
   };
 
-  // Render Ticket Detail =======================================================
+  // Render Ticket Detail
   const renderTicketDetail = (ticket) => {
     const cambio = cambios[ticket._id] || {};
     const vencida = isVencida(ticket);
@@ -620,7 +629,6 @@ function Dashboard() {
     const fechaValue = ticket.fecha_vencimiento ? formatearFechaInput(ticket.fecha_vencimiento) : '';
     const horaValue = ticket.fecha_vencimiento ? formatearHoraInput(ticket.fecha_vencimiento) : '23:59';
 
-    // Preparar configuración inicial de recurrencia desde el ticket
     const recurrenciaInicial = ticket.es_recurrente && ticket.recurrencia ? {
       es_recurrente: ticket.es_recurrente,
       recurrencia: {
@@ -721,9 +729,8 @@ function Dashboard() {
                 </select>
               </div>
 
-              {/* ========== RECURRENCIA CONFIG (IGUAL QUE EN HOME) ========== */}
-              <div className="form-item form-item--wide" style={{ gridColumn: '1 / -1' }}>
-                <RecurrenciaConfig 
+              <div className="form-item form-item--wide">
+                <RecurrenciaConfig
                   config={cambio.recurrenciaConfig || recurrenciaInicial}
                   onChange={(newConfig) => onCambioRecurrencia(ticket._id, newConfig)}
                 />
@@ -763,7 +770,7 @@ function Dashboard() {
     );
   };
 
-  // Render List Card =======================================================
+  // Render List Card
   const renderListCard = (ticket) => {
     const estaAbierto = abiertos[ticket._id];
     if (estaAbierto) return renderTicketDetail(ticket);
@@ -790,7 +797,15 @@ function Dashboard() {
     );
   };
 
-  // Render principal =======================================================
+  // Render principal
+  if (loading && tickets.length === 0) {
+    return (
+      <div className="dashboard-container">
+        <div className="empty"><Loader2 size={32} className="spin" /> Cargando tickets...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard-container">
       <header className="topbar">

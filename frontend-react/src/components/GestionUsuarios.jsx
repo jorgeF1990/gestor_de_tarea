@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API from '../api';
+import { AuthContext } from '../context/AuthContext';
 import { 
   Users, 
   Crown, 
@@ -8,15 +10,11 @@ import {
   CheckCircle, 
   XCircle, 
   RefreshCw, 
-  Shield, 
-  ShieldCheck, 
-  ShieldAlert,
   Mail,
   Bell,
   BellOff,
   AlertCircle,
   Check,
-  X,
   Loader2,
   Edit,
   Save,
@@ -25,13 +23,28 @@ import {
 } from 'lucide-react';
 import './GestionUsuarios.css';
 
+const ROLES = [
+  { value: 'admin', label: 'Administrador', icon: Crown, color: 'rol-admin' },
+  { value: 'soporte', label: 'Soporte Técnico', icon: Wrench, color: 'rol-soporte' },
+  { value: 'usuario', label: 'Usuario', icon: User, color: 'rol-usuario' }
+];
 
 export default function GestionUsuarios() {
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
   const [mensaje, setMensaje] = useState(null);
   const [editando, setEditando] = useState(null);
+
+  useEffect(() => {
+    if (!user || user.rol !== 'admin') {
+      navigate('/');
+      return;
+    }
+    cargarUsuarios();
+  }, [user]);
 
   const cargarUsuarios = async () => {
     setLoading(true);
@@ -40,19 +53,21 @@ export default function GestionUsuarios() {
       const res = await API.get('/admin/usuarios', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setUsuarios(res.data);
+      setUsuarios(res.data || []);
       setMensaje(null);
     } catch (error) {
       console.error('Error al cargar usuarios:', error);
-      setMensaje({ type: 'error', text: error.response?.data?.error || 'Error al cargar usuarios' });
+      setMensaje({ 
+        type: 'error', 
+        text: error.response?.data?.error || 'Error al cargar usuarios' 
+      });
+      if (error.response?.status === 403) {
+        navigate('/');
+      }
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    cargarUsuarios();
-  }, []);
 
   const actualizarUsuario = async (usuarioId, datos) => {
     setSaving(prev => ({ ...prev, [usuarioId]: true }));
@@ -68,7 +83,10 @@ export default function GestionUsuarios() {
       setMensaje({ type: 'success', text: 'Usuario actualizado correctamente' });
       setTimeout(() => setMensaje(null), 3000);
     } catch (error) {
-      setMensaje({ type: 'error', text: error.response?.data?.error || 'Error al actualizar usuario' });
+      setMensaje({ 
+        type: 'error', 
+        text: error.response?.data?.error || 'Error al actualizar usuario' 
+      });
       setTimeout(() => setMensaje(null), 3000);
     } finally {
       setSaving(prev => ({ ...prev, [usuarioId]: false }));
@@ -76,6 +94,11 @@ export default function GestionUsuarios() {
   };
 
   const toggleActivo = (usuario) => {
+    if (usuario._id === user?.id && usuario.activo) {
+      setMensaje({ type: 'error', text: 'No puedes desactivar tu propia cuenta' });
+      setTimeout(() => setMensaje(null), 3000);
+      return;
+    }
     actualizarUsuario(usuario._id, { activo: !usuario.activo });
   };
 
@@ -83,32 +106,8 @@ export default function GestionUsuarios() {
     actualizarUsuario(usuarioId, { rol: nuevoRol });
   };
 
-  const getRolIcono = (rol) => {
-    switch (rol) {
-      case 'admin': return <Crown size={18} />;
-      case 'soporte': return <Wrench size={18} />;
-      default: return <User size={18} />;
-    }
-  };
-
-  const getRolColor = (rol) => {
-    switch (rol) {
-      case 'admin': return 'rol-admin';
-      case 'soporte': return 'rol-soporte';
-      default: return 'rol-usuario';
-    }
-  };
-
-  const getRolNombre = (rol) => {
-    switch (rol) {
-      case 'admin': return 'Administrador';
-      case 'soporte': return 'Soporte Técnico';
-      default: return 'Usuario';
-    }
-  };
-
-  const getEstadoIcono = (activo) => {
-    return activo ? <CheckCircle size={16} className="estado-activo" /> : <XCircle size={16} className="estado-inactivo" />;
+  const getRolInfo = (rol) => {
+    return ROLES.find(r => r.value === rol) || ROLES[2];
   };
 
   if (loading) {
@@ -150,82 +149,94 @@ export default function GestionUsuarios() {
             </tr>
           </thead>
           <tbody>
-            {usuarios.map(usuario => (
-              <tr key={usuario._id} className={!usuario.activo ? 'usuario-inactivo' : ''}>
-                <td>
-                  <div className="usuario-info">
-                    <div className={`usuario-avatar ${getRolColor(usuario.rol)}`}>
-                      {getRolIcono(usuario.rol)}
+            {usuarios.map(usuario => {
+              const rolInfo = getRolInfo(usuario.rol);
+              const RolIcon = rolInfo.icon;
+              const esUsuarioActual = usuario._id === user?.id;
+
+              return (
+                <tr key={usuario._id} className={!usuario.activo ? 'usuario-inactivo' : ''}>
+                  <td>
+                    <div className="usuario-info">
+                      <div className={`usuario-avatar ${rolInfo.color}`}>
+                        <RolIcon size={18} />
+                      </div>
+                      <span className="usuario-nombre">
+                        {usuario.nombre || usuario.email.split('@')[0]}
+                        {esUsuarioActual && <span className="usuario-actual"> (tú)</span>}
+                      </span>
                     </div>
-                    <span className="usuario-nombre">{usuario.nombre || usuario.email.split('@')[0]}</span>
-                  </div>
-                </td>
-                <td className="usuario-email">{usuario.email}</td>
-                <td>
-                  {editando === usuario._id ? (
-                    <select
-                      value={usuario.rol}
-                      onChange={(e) => cambiarRol(usuario._id, e.target.value)}
-                      disabled={saving[usuario._id]}
-                      className="rol-select"
-                    >
-                      <option value="admin">Administrador</option>
-                      <option value="soporte">Soporte</option>
-                      <option value="usuario">Usuario</option>
-                    </select>
-                  ) : (
-                    <span className={`rol-badge ${getRolColor(usuario.rol)}`}>
-                      {getRolIcono(usuario.rol)}
-                      {getRolNombre(usuario.rol)}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  <button
-                    className={`btn-estado ${usuario.activo ? 'activo' : 'inactivo'}`}
-                    onClick={() => toggleActivo(usuario)}
-                    disabled={saving[usuario._id]}
-                    title={usuario.activo ? 'Desactivar usuario' : 'Activar usuario'}
-                  >
-                    {usuario.activo ? <Power size={14} /> : <PowerOff size={14} />}
-                    {usuario.activo ? 'Activo' : 'Inactivo'}
-                  </button>
-                </td>
-                <td>
-                  <div className="notificaciones-info">
-                    {usuario.notificaciones?.recordatorios_vencimiento !== false ? (
-                      <Bell size={14} className="notif-on" />
-                    ) : (
-                      <BellOff size={14} className="notif-off" />
-                    )}
-                    <span className="notif-text">
-                      {usuario.notificaciones?.recordatorios_vencimiento !== false ? 'Activadas' : 'Silenciadas'}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div className="acciones-usuario">
+                  </td>
+                  <td className="usuario-email">
+                    <Mail size={14} className="email-icon" />
+                    {usuario.email}
+                  </td>
+                  <td>
                     {editando === usuario._id ? (
-                      <button
-                        className="btn-save"
-                        onClick={() => setEditando(null)}
-                        disabled={saving[usuario._id]}
+                      <select
+                        value={usuario.rol}
+                        onChange={(e) => cambiarRol(usuario._id, e.target.value)}
+                        disabled={saving[usuario._id] || esUsuarioActual}
+                        className="rol-select"
                       >
-                        <Save size={16} /> Guardar
-                      </button>
+                        {ROLES.map(r => (
+                          <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
                     ) : (
-                      <button
-                        className="btn-edit"
-                        onClick={() => setEditando(usuario._id)}
-                        disabled={saving[usuario._id]}
-                      >
-                        <Edit size={16} /> Editar
-                      </button>
+                      <span className={`rol-badge ${rolInfo.color}`}>
+                        <RolIcon size={14} />
+                        {rolInfo.label}
+                      </span>
                     )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td>
+                    <button
+                      className={`btn-estado ${usuario.activo ? 'activo' : 'inactivo'}`}
+                      onClick={() => toggleActivo(usuario)}
+                      disabled={saving[usuario._id] || esUsuarioActual}
+                      title={usuario.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                    >
+                      {usuario.activo ? <Power size={14} /> : <PowerOff size={14} />}
+                      {usuario.activo ? 'Activo' : 'Inactivo'}
+                    </button>
+                  </td>
+                  <td>
+                    <div className="notificaciones-info">
+                      {usuario.notificaciones?.recordatorios_vencimiento !== false ? (
+                        <Bell size={14} className="notif-on" />
+                      ) : (
+                        <BellOff size={14} className="notif-off" />
+                      )}
+                      <span className="notif-text">
+                        {usuario.notificaciones?.recordatorios_vencimiento !== false ? 'Activadas' : 'Silenciadas'}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="acciones-usuario">
+                      {editando === usuario._id ? (
+                        <button
+                          className="btn-save"
+                          onClick={() => setEditando(null)}
+                          disabled={saving[usuario._id]}
+                        >
+                          <Save size={16} /> Guardar
+                        </button>
+                      ) : (
+                        <button
+                          className="btn-edit"
+                          onClick={() => setEditando(usuario._id)}
+                          disabled={saving[usuario._id]}
+                        >
+                          <Edit size={16} /> Editar
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

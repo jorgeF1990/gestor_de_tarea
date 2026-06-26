@@ -1,72 +1,123 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import "./AppShell.css";
 
-export default function AppShell({ children }) {
-  const [open, setOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [theme, setTheme] = useState("light");
+// Iconos
+import { Menu, Sun, Moon, LogOut, User } from "lucide-react";
 
-  // Detectar tamaño de pantalla (para saber si es móvil)
+export default function AppShell({ children }) {
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem("theme");
+    if (stored) return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  // Detectar móvil
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+      if (window.innerWidth > 768) {
+        setIsOpen(false);
+      }
+    };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Cargar tema guardado o detectar preferencia del sistema
+  // Aplicar tema
   useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored) {
-      setTheme(stored);
-      document.documentElement.setAttribute("data-theme", stored);
-    } else {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const defaultTheme = prefersDark ? "dark" : "light";
-      setTheme(defaultTheme);
-      document.documentElement.setAttribute("data-theme", defaultTheme);
-    }
-  }, []);
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
-  // Cambiar tema manualmente
   const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("theme", newTheme);
+    setTheme(prev => prev === "light" ? "dark" : "light");
   };
 
-  const handleMouseEnterSidebar = () => {
-    if (!isMobile) setOpen(true);
+  const toggleSidebar = () => {
+    setIsOpen(prev => !prev);
   };
 
-  const handleMouseLeaveSidebar = () => {
-    if (!isMobile) setOpen(false);
+  const closeSidebar = () => {
+    if (isMobile) setIsOpen(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    navigate("/login");
+  };
+
+  const handleMouseEnter = () => {
+    if (!isMobile) setIsOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isMobile) setIsOpen(false);
   };
 
   return (
-    <div
-      className={`appshell ${open ? "appshell--open" : "appshell--closed"} ${theme === "dark" ? "dark-mode" : ""}`}
-    >
-      {/* Sidebar solo responde al hover en escritorio */}
+    <div className={`appshell ${isOpen ? "appshell--open" : "appshell--closed"}`}>
+      {/* Overlay para móvil */}
+      <div className="appshell-overlay" onClick={closeSidebar} />
+
+      {/* Sidebar */}
       <div
         className="appshell-sidebar-wrap"
-        onMouseEnter={handleMouseEnterSidebar}
-        onMouseLeave={handleMouseLeaveSidebar}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        <Sidebar open={open} onToggle={() => setOpen((o) => !o)} />
+        <Sidebar 
+          open={isOpen} 
+          onToggle={toggleSidebar}
+          onClose={closeSidebar}
+          isMobile={isMobile}
+        />
       </div>
 
+      {/* Contenido principal */}
       <main className="appshell-content">
-        {/* Botón de cambio de tema */}
-        <div className="appshell-theme-toggle">
-          <button onClick={toggleTheme} className="theme-btn">
-            {theme === "light" ? " Modo oscuro" : " Modo claro"}
-          </button>
-        </div>
+        {/* Header */}
+        <header className="appshell-header">
+          <div className="appshell-header-left">
+            <button 
+              className="menu-toggle" 
+              onClick={toggleSidebar}
+              aria-label="Toggle sidebar"
+            >
+              <Menu size={24} />
+            </button>
+          </div>
 
-        <div className="appshell-inner">{children}</div>
+          <div className="appshell-header-right">
+            <button 
+              className="theme-toggle" 
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+              <span>{theme === "light" ? "Oscuro" : "Claro"}</span>
+            </button>
+
+            <button 
+              className="theme-toggle" 
+              onClick={handleLogout}
+              aria-label="Logout"
+            >
+              <LogOut size={16} />
+              <span>Salir</span>
+            </button>
+          </div>
+        </header>
+
+        <div className="appshell-inner">
+          {children}
+        </div>
       </main>
     </div>
   );

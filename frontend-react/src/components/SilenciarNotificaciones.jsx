@@ -3,19 +3,19 @@ import API from '../api';
 import { Bell, BellOff, Clock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import './SilenciarNotificaciones.css';
 
+const OPCIONES_DIAS = [
+  { dias: 7, label: '1 semana' },
+  { dias: 14, label: '2 semanas' },
+  { dias: 30, label: '1 mes' },
+  { dias: 90, label: '3 meses' },
+  { dias: 365, label: '1 año' }
+];
+
 const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
   const [estado, setEstado] = useState({ habilitadas: true, silenciadoHasta: null });
   const [loading, setLoading] = useState(false);
   const [mostrarOpciones, setMostrarOpciones] = useState(false);
   const [mensaje, setMensaje] = useState(null);
-
-  const opcionesDias = [
-    { dias: 7, label: '1 semana' },
-    { dias: 14, label: '2 semanas' },
-    { dias: 30, label: '1 mes' },
-    { dias: 90, label: '3 meses' },
-    { dias: 365, label: '1 año' }
-  ];
 
   const cargarEstado = async () => {
     if (!ticketId) return;
@@ -26,7 +26,7 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
       });
       setEstado(res.data);
     } catch (error) {
-      console.error('Error al cargar estado:', error);
+      console.error('[Silenciar] Error al cargar estado:', error);
     }
   };
 
@@ -52,7 +52,10 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
       if (onEstadoCambiado) onEstadoCambiado();
       setTimeout(() => setMensaje(null), 5000);
     } catch (error) {
-      setMensaje({ type: 'error', text: error.response?.data?.error || 'Error al silenciar' });
+      setMensaje({ 
+        type: 'error', 
+        text: error.response?.data?.error || 'Error al silenciar notificaciones' 
+      });
     } finally {
       setLoading(false);
     }
@@ -69,11 +72,14 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await cargarEstado();
-      setMensaje({ type: 'success', text: 'Notificaciones reanudadas' });
+      setMensaje({ type: 'success', text: 'Notificaciones reanudadas correctamente' });
       if (onEstadoCambiado) onEstadoCambiado();
       setTimeout(() => setMensaje(null), 5000);
     } catch (error) {
-      setMensaje({ type: 'error', text: error.response?.data?.error || 'Error al reanudar' });
+      setMensaje({ 
+        type: 'error', 
+        text: error.response?.data?.error || 'Error al reanudar notificaciones' 
+      });
     } finally {
       setLoading(false);
     }
@@ -85,7 +91,11 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
   };
 
   const silenciadoHasta = estado.silenciadoHasta 
-    ? new Date(estado.silenciadoHasta).toLocaleDateString()
+    ? new Date(estado.silenciadoHasta).toLocaleDateString('es-AR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      })
     : null;
 
   if (estaSilenciado()) {
@@ -98,7 +108,11 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
           <div className="silenciar-titulo">Notificaciones silenciadas</div>
           <div className="silenciar-subtitulo">Hasta {silenciadoHasta}</div>
         </div>
-        <button className="btn-reanudar" onClick={reanudar} disabled={loading}>
+        <button 
+          className="btn-reanudar" 
+          onClick={reanudar} 
+          disabled={loading}
+        >
           {loading ? <Loader2 size={16} className="spin" /> : <Bell size={16} />}
           {loading ? 'Procesando...' : 'Reanudar'}
         </button>
@@ -116,7 +130,11 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
       )}
       
       {!mostrarOpciones ? (
-        <button className="btn-silenciar" onClick={() => setMostrarOpciones(true)} disabled={loading}>
+        <button 
+          className="btn-silenciar" 
+          onClick={() => setMostrarOpciones(true)} 
+          disabled={loading}
+        >
           <BellOff size={16} />
           Silenciar notificaciones
         </button>
@@ -127,14 +145,23 @@ const SilenciarNotificaciones = ({ ticketId, onEstadoCambiado }) => {
             Silenciar por:
           </div>
           <div className="silenciar-opciones-botones">
-            {opcionesDias.map(op => (
-              <button key={op.dias} className="btn-opcion" onClick={() => silenciar(op.dias)} disabled={loading}>
+            {OPCIONES_DIAS.map(op => (
+              <button 
+                key={op.dias} 
+                className="btn-opcion" 
+                onClick={() => silenciar(op.dias)} 
+                disabled={loading}
+              >
                 <Clock size={14} />
                 {op.label}
               </button>
             ))}
           </div>
-          <button className="btn-cancelar" onClick={() => setMostrarOpciones(false)} disabled={loading}>
+          <button 
+            className="btn-cancelar" 
+            onClick={() => setMostrarOpciones(false)} 
+            disabled={loading}
+          >
             Cancelar
           </button>
         </div>

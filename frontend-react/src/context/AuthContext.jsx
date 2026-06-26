@@ -4,12 +4,15 @@ import { jwtDecode } from "jwt-decode";
 export const AuthContext = createContext({
   user: null,
   token: null,
-  login: async (_token, _opts) => {},
+  isAuthenticated: false,
+  loading: true,
+  login: async (token, opts) => {},
   logout: () => {},
-  hasRole: () => false,
+  hasRole: (roles) => false,
+  updateUser: (data) => {}
 });
 
-function readInitialToken() {
+function getInitialToken() {
   const ls = localStorage.getItem("token");
   if (ls) return ls;
   const ss = sessionStorage.getItem("token");
@@ -17,59 +20,80 @@ function readInitialToken() {
   return null;
 }
 
-export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => readInitialToken());
-  const [user, setUser] = useState(() => {
-    const t = readInitialToken();
-    if (!t) return null;
-    try {
-      const p = jwtDecode(t);
-      return { id: p.id || p._id || p.sub, email: p.email, rol: p.rol || "usuario" };
-    } catch {
+function decodeToken(token) {
+  try {
+    const decoded = jwtDecode(token);
+    const exp = decoded.exp ? decoded.exp * 1000 : null;
+    
+    if (exp && Date.now() >= exp) {
       return null;
     }
-  });
+    
+    return {
+      id: decoded.id || decoded._id || decoded.sub,
+      email: decoded.email,
+      rol: decoded.rol || "usuario",
+      nombre: decoded.nombre || decoded.name || "Usuario",
+      exp: exp
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function AuthProvider({ children }) {
+  const [token, setToken] = useState(() => getInitialToken());
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!token) {
       setUser(null);
-      localStorage.removeItem("token");
-      sessionStorage.removeItem("token");
+      setLoading(false);
       return;
     }
+
     try {
-      const p = jwtDecode(token);
-      const exp = p.exp ? p.exp * 1000 : null;
-      if (exp && Date.now() >= exp) {
-        setUser(null);
-        setToken(null);
+      const decoded = decodeToken(token);
+      if (decoded) {
+        setUser(decoded);
+        // Auto-refresh si el token expira pronto (5 min)
+        if (decoded.exp && decoded.exp - Date.now() < 300000) {
+          console.warn('[Auth] Token expira pronto, redirigiendo a refresh');
+          // Aquí se podría implementar refresh token
+        }
+      } else {
+        // Token inválido o expirado
         localStorage.removeItem("token");
         sessionStorage.removeItem("token");
-        return;
+        setToken(null);
+        setUser(null);
       }
-      setUser({ id: p.id || p._id || p.sub, email: p.email, rol: p.rol || "usuario" });
-    } catch {
-      setUser(null);
-      setToken(null);
+    } catch (error) {
+      console.error('[Auth] Error decodificando token:', error);
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
+      setToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
   }, [token]);
-
-  const hasRole = useCallback((roles) => {
-    if (!user) return false;
-    const list = Array.isArray(roles) ? roles : [roles];
-    return list.includes(user.rol);
-  }, [user]);
 
   const login = useCallback(async (newToken, opts = { remember: true }) => {
     setToken(newToken);
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
+    
     if (opts.remember) {
       localStorage.setItem("token", newToken);
     } else {
       sessionStorage.setItem("token", newToken);
+    }
+    
+    const decoded = decodeToken(newToken);
+    if (decoded) {
+      setUser(decoded);
     }
   }, []);
 
@@ -80,7 +104,30 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem("token");
   }, []);
 
-  const value = useMemo(() => ({ user, token, login, logout, hasRole }), [user, token, login, logout, hasRole]);
+  const hasRole = useCallback((roles) => {
+    if (!user) return false;
+    const roleList = Array.isArray(roles) ? roles : [roles];
+    return roleList.includes(user.rol);
+  }, [user]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const updateUser = useCallback((data) => {
+    setUser(prev => prev ? { ...prev, ...data } : null);
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    token,
+    isAuthenticated: !!user && !!token,
+    loading,
+    login,
+    logout,
+    hasRole,
+    updateUser
+  }), [user, token, loading, login, logout, hasRole, updateUser]);
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

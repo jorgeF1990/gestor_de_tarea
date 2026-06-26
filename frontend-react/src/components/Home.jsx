@@ -4,9 +4,8 @@ import API from "../api";
 import { AuthContext } from "../context/AuthContext";
 import "./Home.css";
 import AsignarUsuarios from "./AsignarUsuarios";
-import RecurrenciaConfig from "../components/RecurrenciaConfig";
+import RecurrenciaConfig from "./RecurrenciaConfig";
 
-// Importar iconos profesionales de Lucide React
 import {
   Calendar,
   Clock,
@@ -25,13 +24,18 @@ import {
   Paperclip,
   Trash2,
   CalendarDays,
-  Clock3
+  Clock3,
+  Home as HomeIcon
 } from 'lucide-react';
 
 const MAX_ASUNTO = 120;
 const MAX_DESC = 1000;
 
 function Home() {
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const version = import.meta.env.VITE_VERSION;
+
   const [asunto, setAsunto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [imagen, setImagen] = useState(null);
@@ -47,9 +51,6 @@ function Home() {
     recurrencia: null
   });
   
-  const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const version = import.meta.env.VITE_VERSION;
   const fileInputRef = useRef(null);
   const fechaInputRef = useRef(null);
   const horaInputRef = useRef(null);
@@ -70,10 +71,17 @@ function Home() {
 
   const handleImage = (file) => {
     if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      setMensaje("La imagen no puede superar los 5MB.");
+      return;
+    }
+    
     if (!file.type?.startsWith("image/")) {
       setMensaje("Solo se permiten imágenes.");
       return;
     }
+    
     setImagen(file);
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result);
@@ -83,7 +91,7 @@ function Home() {
   const handleDrop = (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    handleImage(file);
+    if (file) handleImage(file);
   };
 
   const handlePaste = (e) => {
@@ -91,29 +99,21 @@ function Home() {
     for (let i = 0; i < items.length; i++) {
       if (items[i].type?.startsWith("image/")) {
         const blob = items[i].getAsFile();
-        handleImage(blob);
+        if (blob) handleImage(blob);
         break;
       }
-    }
-  };
-
-  const abrirSelectorFecha = () => {
-    if (fechaInputRef.current) {
-      fechaInputRef.current.showPicker();
-    }
-  };
-
-  const abrirSelectorHora = () => {
-    if (horaInputRef.current) {
-      horaInputRef.current.showPicker();
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMensaje("");
+
     const token = localStorage.getItem("token");
-    if (!token) return navigate("/login");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
 
     if (!asunto.trim() || !descripcion.trim()) {
       setMensaje("Completá asunto y descripción.");
@@ -132,7 +132,7 @@ function Home() {
     if (imagen) formData.append("imagen", imagen);
     
     if (usuariosAsignados.length > 0) {
-      const usuariosIds = usuariosAsignados.map(u => u._id);
+      const usuariosIds = usuariosAsignados.map(u => u._id || u.id);
       formData.append("usuarios_asignados", JSON.stringify(usuariosIds));
     }
 
@@ -143,7 +143,7 @@ function Home() {
       formData.append("recurrencia_intervalo", rec.intervalo?.toString() || "1");
       formData.append("solo_dias_habiles", rec.solo_dias_habiles ? "true" : "false");
       
-      if (rec.tipo === 'semanal' && rec.dias_semana) {
+      if (rec.tipo === 'semanal' && rec.dias_semana?.length) {
         formData.append("dias_semana", JSON.stringify(rec.dias_semana));
       }
       
@@ -166,23 +166,23 @@ function Home() {
       });
       setMensaje("Tarea creada con éxito");
       resetForm();
+      setTimeout(() => setMensaje(""), 5000);
     } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.message ||
-        "Ocurrió un error al crear la tarea";
+      const msg = err?.response?.data?.error || err?.message || "Ocurrió un error al crear la tarea";
       setMensaje(`Error: ${msg}`);
     } finally {
       setLoading(false);
     }
   };
 
+  const isAdmin = user?.rol === 'admin';
+
   return (
     <div className="home">
       <div className="home-card">
         <div className="home-header">
           <img src="/logo.svg" alt="Logo" className="home-logo" />
-          <div>
+          <div className="home-title-group">
             <h1 className="home-title">TareaSync</h1>
             <p className="home-subtitle">Gestión inteligente de tareas</p>
           </div>
@@ -190,24 +190,24 @@ function Home() {
 
         {!user ? (
           <div className="home-auth-cta">
-            <div className="welcome-icon">
+            <div className="welcome-icon" aria-hidden="true">
               <Star size={48} />
             </div>
             <h2>Bienvenido</h2>
             <p>Para crear una tarea necesitás iniciar sesión.</p>
             <div className="home-auth-buttons">
               <Link to="/login" className="btn btn-primary">
-                <LogIn size={16} /> Login
+                <LogIn size={16} /> Iniciar sesión
               </Link>
               <Link to="/register" className="btn btn-secondary">
-                <UserPlus size={16} /> Register
+                <UserPlus size={16} /> Registrarse
               </Link>
             </div>
           </div>
         ) : (
           <>
             <h2 className="home-section-title">
-              <FileText size={18} /> Crear nueva Tarea
+              <FileText size={18} /> Crear nueva tarea
             </h2>
             <form className="home-form" onSubmit={handleSubmit}>
               <div className="form-group">
@@ -219,13 +219,12 @@ function Home() {
                   name="asunto"
                   type="text"
                   value={asunto}
-                  onChange={(e) =>
-                    setAsunto(e.target.value.slice(0, MAX_ASUNTO))
-                  }
+                  onChange={(e) => setAsunto(e.target.value.slice(0, MAX_ASUNTO))}
                   placeholder="Ej.: No puedo acceder a mi cuenta"
                   maxLength={MAX_ASUNTO}
                   disabled={loading}
                   required
+                  autoFocus
                 />
                 <div className="counter">
                   {asunto.length}/{MAX_ASUNTO}
@@ -240,9 +239,7 @@ function Home() {
                   id="descripcion"
                   name="descripcion"
                   value={descripcion}
-                  onChange={(e) =>
-                    setDescripcion(e.target.value.slice(0, MAX_DESC))
-                  }
+                  onChange={(e) => setDescripcion(e.target.value.slice(0, MAX_DESC))}
                   placeholder="Contanos qué sucede, pasos para reproducir, capturas, etc."
                   rows={6}
                   maxLength={MAX_DESC}
@@ -257,9 +254,9 @@ function Home() {
               <div className="form-row">
                 <div className="form-group half">
                   <label htmlFor="fecha_vencimiento">
-                    <CalendarDays size={14} /> Fecha de Vencimiento
+                    <CalendarDays size={14} /> Fecha de vencimiento
                   </label>
-                  <div className="date-time-wrapper" onClick={abrirSelectorFecha}>
+                  <div className="date-time-wrapper" onClick={() => fechaInputRef.current?.showPicker()}>
                     <Calendar size={16} className="input-icon" />
                     <input
                       ref={fechaInputRef}
@@ -275,9 +272,9 @@ function Home() {
                 </div>
                 <div className="form-group half">
                   <label htmlFor="hora_vencimiento">
-                    <Clock3 size={14} /> Hora de Vencimiento
+                    <Clock3 size={14} /> Hora de vencimiento
                   </label>
-                  <div className="date-time-wrapper" onClick={abrirSelectorHora}>
+                  <div className="date-time-wrapper" onClick={() => horaInputRef.current?.showPicker()}>
                     <Clock size={16} className="input-icon" />
                     <input
                       ref={horaInputRef}
@@ -387,9 +384,7 @@ function Home() {
 
         {mensaje && (
           <div
-            className={`home-alert ${
-              mensaje.startsWith("Error") ? "err" : "ok"
-            }`}
+            className={`home-alert ${mensaje.startsWith("Error") ? "err" : "ok"}`}
             role="alert"
           >
             {mensaje.startsWith("Error") ? (
@@ -407,7 +402,7 @@ function Home() {
           <Link to="/tickets" className="home-link">
             <Ticket size={14} /> Mis tareas
           </Link>
-          {user?.rol === "admin" && (
+          {isAdmin && (
             <>
               <span>•</span>
               <Link to="/dashboard" className="home-link">

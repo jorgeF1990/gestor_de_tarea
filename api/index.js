@@ -1,38 +1,216 @@
-console.log('=== VERCEL SERVERLESS START ===');
+// api/index.js
+console.log('[VERCEL] Iniciando función serverless');
 
-// Forzar variables de entorno
-const MONGODB_URI = 'mongodb+srv://admin:Tickets2026@tickets-cluster.5mikqmi.mongodb.net/tickets?retryWrites=true&w=majority&appName=tickets-cluster';
-if (!process.env.MONGODB_URI) process.env.MONGODB_URI = MONGODB_URI;
-if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'clave_secreta_para_jwt_vercel_2026';
-process.env.NODE_ENV = 'production';
-process.env.VERCEL = '1';
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
-try {
-  // Cargar backend desde la raíz
-  const app = require('../backend/app.js');
-  console.log('[BACKEND] ✅ App cargada correctamente');
-  module.exports = app;
-} catch (err) {
-  console.error('[BACKEND] ❌ Error:', err.message);
-  
-  // Fallback
-  const express = require('express');
-  const cors = require('cors');
-  const fallbackApp = express();
-  fallbackApp.use(cors({ origin: true, credentials: true }));
-  fallbackApp.use(express.json());
-  
-  fallbackApp.get('/health', (req, res) => {
-    res.json({ ok: true, status: 'healthy', mode: 'fallback' });
-  });
-  
-  fallbackApp.post('/auth/login', (req, res) => {
-    res.json({ token: 'fake_token_' + Date.now(), usuario: { email: req.body.email } });
-  });
-  
-  fallbackApp.all('*', (req, res) => {
-    res.status(404).json({ error: 'Not found', path: req.path });
-  });
-  
-  module.exports = fallbackApp;
+// ============================================================
+// CONFIGURACIÓN - VARIABLES DE ENTORNO
+// ============================================================
+const MONGODB_URI = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!MONGODB_URI) {
+  console.error('[VERCEL] ERROR: MONGODB_URI no definida');
 }
+
+if (!JWT_SECRET) {
+  console.warn('[VERCEL] WARNING: JWT_SECRET no definida');
+}
+
+// ============================================================
+// EXPRESS APP
+// ============================================================
+const app = express();
+
+// CORS Configuration
+const allowedOrigins = [
+  'https://tareasync.vercel.app',
+  'https://gestor-de-tarea-sepia.vercel.app',
+  'https://gestor-de-tarea-os8w-jorgesfb29-gmailcoms-projects.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn('[CORS] Bloqueado:', origin);
+    return callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
+app.options('*', cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ============================================================
+// MONGODB CONNECTION (CACHED)
+// ============================================================
+const mongooseOptions = {
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 5000,
+  socketTimeoutMS: 30000,
+  maxPoolSize: 5,
+  minPoolSize: 1,
+  family: 4
+};
+
+let cachedConnection = null;
+let isConnecting = false;
+
+async function connectToMongoDB() {
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    return cachedConnection;
+  }
+
+  if (isConnecting) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return connectToMongoDB();
+  }
+
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI no definida');
+  }
+
+  isConnecting = true;
+
+  try {
+    console.log('[VERCEL] Conectando a MongoDB...');
+    const conn = await mongoose.connect(MONGODB_URI, mongooseOptions);
+    cachedConnection = conn;
+    console.log('[VERCEL] MongoDB conectado exitosamente');
+    return conn;
+  } catch (error) {
+    console.error('[VERCEL] Error conectando a MongoDB:', error.message);
+    cachedConnection = null;
+    throw error;
+  } finally {
+    isConnecting = false;
+  }
+}
+
+async function ensureConnection(req, res, next) {
+  try {
+    await connectToMongoDB();
+    next();
+  } catch (error) {
+    res.status(503).json({
+      error: 'Database service unavailable',
+      message: error.message
+    });
+  }
+}
+
+// ============================================================
+// HEALTH CHECKS
+// ============================================================
+app.get('/health', async (req, res) => {
+  try {
+    const status = mongoose.connection.readyState;
+    const statusText = ['disconnected', 'connected', 'connecting', 'disconnecting'][status] || 'unknown';
+
+    res.json({
+      ok: true,
+      status: 'healthy',
+      mongodb: status === 1 ? 'connected' : 'disconnected',
+      mongodbStatus: statusText,
+      environment: process.env.NODE_ENV || 'production',
+      vercel: true,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: 'Health check failed',
+      message: error.message
+    });
+  }
+});
+
+app.get('/ping-db', async (req, res) => {
+  try {
+    await connectToMongoDB();
+    await mongoose.connection.db.admin().ping();
+
+    res.json({
+      ok: true,
+      message: 'MongoDB responde correctamente',
+      readyState: mongoose.connection.readyState,
+      readyStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown'
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: 'Error conectando a MongoDB',
+      message: error.message
+    });
+  }
+});
+
+// ============================================================
+// RUTAS - IMPORTAR DESDE BACKEND
+// ============================================================
+try {
+  const authRoutes = require('../backend/routes/auth.routes');
+  const ticketRoutes = require('../backend/routes/ticket.routes');
+  const adminRoutes = require('../backend/routes/admin.routes');
+  const calendarRoutes = require('../backend/routes/calendar.routes');
+
+  app.use('/auth', ensureConnection, authRoutes);
+  app.use('/tickets', ensureConnection, ticketRoutes);
+  app.use('/admin', ensureConnection, adminRoutes);
+  app.use('/calendar', ensureConnection, calendarRoutes);
+
+  console.log('[VERCEL] Rutas cargadas correctamente');
+} catch (error) {
+  console.error('[VERCEL] Error cargando rutas:', error.message);
+  
+  // Fallback para rutas básicas
+  app.get('/api/status', (req, res) => {
+    res.json({ status: 'ok', message: 'API running in fallback mode' });
+  });
+}
+
+// ============================================================
+// MANEJO DE ERRORES
+// ============================================================
+app.use((err, req, res, next) => {
+  console.error('[VERCEL] Error:', err.message);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Contact administrator'
+  });
+});
+
+// ============================================================
+// ROOT
+// ============================================================
+app.get('/', (req, res) => {
+  res.json({
+    message: 'TareaSync API',
+    version: '1.0.0',
+    status: 'online',
+    endpoints: {
+      health: '/health',
+      ping: '/ping-db',
+      auth: '/auth',
+      tickets: '/tickets',
+      admin: '/admin',
+      calendar: '/calendar'
+    }
+  });
+});
+
+// ============================================================
+// EXPORT
+// ============================================================
+module.exports = app;

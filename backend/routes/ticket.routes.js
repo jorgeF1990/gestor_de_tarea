@@ -56,7 +56,26 @@ router.post('/', auth, upload.single('imagen'), crearTicket);
 router.get('/', auth, obtenerTickets);
 router.get('/:id', auth, obtenerTicketPorId);
 router.put('/:id/estado', auth, actualizarEstado);
-router.put('/:id/comentario', auth, upload.single('imagen'), agregarComentario);
+
+router.put('/:id/comentario', auth, (req, res, next) => {
+  upload.single('imagen')(req, res, (err) => {
+    if (err) {
+      console.error('[MULTER] Error al subir archivo:', err.message);
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+          error: 'Error al subir archivo',
+          details: err.message
+        });
+      }
+      return res.status(500).json({
+        error: 'Error al procesar archivo',
+        details: err.message
+      });
+    }
+    next();
+  });
+}, agregarComentario);
+
 router.put('/:id/leido', auth, marcarLeido);
 router.delete('/:id', auth, eliminarTicket);
 router.get('/:id/calendar', auth, generarEventoCalendar);
@@ -113,9 +132,9 @@ router.post('/:id/silenciar', auth, async (req, res) => {
       }
     }, { runValidators: false });
     
-    res.json({ 
-      success: true, 
-      message: `Notificaciones silenciadas hasta ${silenciarHasta.toLocaleDateString()}` 
+    res.json({
+      success: true,
+      message: 'Notificaciones silenciadas hasta ' + silenciarHasta.toLocaleDateString()
     });
   } catch (error) {
     console.error('Error al silenciar notificaciones:', error.message);

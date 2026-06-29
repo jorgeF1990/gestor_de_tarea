@@ -186,11 +186,11 @@ app.get('/ping-db', async (req, res) => {
 // RUTAS - IMPORTAR DESDE BACKEND USANDO ROOT PATH
 // ============================================================
 try {
-  const authRoutes = require(`${__root}/backend/routes/auth.routes`);
-  const ticketRoutes = require(`${__root}/backend/routes/ticket.routes`);
-  const adminRoutes = require(`${__root}/backend/routes/admin.routes`);
-  const calendarRoutes = require(`${__root}/backend/routes/calendar.routes`);
-
+  const authRoutes = require('./backend/routes/auth.routes');
+  const ticketRoutes = require('./backend/routes/ticket.routes');
+  const adminRoutes = require('./backend/routes/admin.routes');
+  const calendarRoutes = require('./backend/routes/calendar.routes');
+  
   app.use('/auth', ensureConnection, authRoutes);
   app.use('/tickets', ensureConnection, ticketRoutes);
   app.use('/admin', ensureConnection, adminRoutes);

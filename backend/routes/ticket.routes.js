@@ -4,9 +4,8 @@ const router = express.Router();
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const rootPath = require('app-root-path');
 
-const auth = require(`${rootPath.path}/backend/middlewares/auth`);
+const auth = require('../middlewares/auth');
 
 const {
   crearTicket,
@@ -23,8 +22,6 @@ const {
   obtenerUsuariosDisponibles,
   actualizarRecurrencia
 } = require('../controllers/tickets.controller');
-
-
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dfuybsomz',

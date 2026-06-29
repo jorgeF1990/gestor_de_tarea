@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const rootPath = require('app-root-path');
 
-const auth = require(`${rootPath.path}/backend/middlewares/auth`);
-const googleCalendarService = require(`${rootPath.path}/backend/services/googleCalendar.service`);
-const outlookCalendarService = require(`${rootPath.path}/backend/services/outlookCalendar.service`);
-const Ticket = require(`${rootPath.path}/backend/models/ticket.model`);
+const auth = require('../middlewares/auth');
+const googleCalendarService = require('../services/googleCalendar.service');
+const outlookCalendarService = require('../services/outlookCalendar.service');
+const Ticket = require('../models/ticket.model');
 
 // ==================== GOOGLE CALENDAR ====================
 

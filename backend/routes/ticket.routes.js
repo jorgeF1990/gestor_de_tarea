@@ -24,7 +24,7 @@ const {
   actualizarRecurrencia
 } = require('../controllers/tickets.controller');
 
-const router = express.Router();
+
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dfuybsomz',

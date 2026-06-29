@@ -11,7 +11,6 @@ const result = dotenv.config({ path: envPath });
 
 if (result.error) {
   console.error('[VERCEL] Error cargando .env:', result.error.message);
-  // Intentar desde la raíz actual
   const fallbackPath = path.join(__dirname, '.env');
   console.log('[VERCEL] Intentando desde:', fallbackPath);
   const fallback = dotenv.config({ path: fallbackPath });
@@ -77,6 +76,10 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200
 }));
+
+//  MIDDLEWARES PARA PARSEAR JSON Y URLENCODED
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ============================================================
 // MONGODB CONNECTION (CACHED)
@@ -183,7 +186,7 @@ app.get('/ping-db', async (req, res) => {
 });
 
 // ============================================================
-// RUTAS - IMPORTAR DESDE BACKEND USANDO ROOT PATH
+// RUTAS - IMPORTAR DESDE BACKEND
 // ============================================================
 try {
   const authRoutes = require(path.join(__dirname, '..', 'backend', 'routes', 'auth.routes'));
@@ -200,7 +203,6 @@ try {
 } catch (error) {
   console.error('[VERCEL] Error cargando rutas:', error.message);
   
-  // Fallback para rutas basicas
   app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'API running in fallback mode' });
   });

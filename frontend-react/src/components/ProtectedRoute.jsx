@@ -11,15 +11,37 @@ import { AuthContext } from "../context/AuthContext";
  * Si no pasás roles, solo requiere estar logueado.
  */
 export default function ProtectedRoute({ roles, children }) {
-  const { user, hasRole } = useContext(AuthContext);
+  const { user, isAuthenticated, loading } = useContext(AuthContext);
   const location = useLocation();
 
-  if (!user) {
+  //  Esperar a que termine la carga del token
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div className="loader"></div>
+        <p style={{ color: 'var(--text-secondary)' }}>Cargando sesión...</p>
+      </div>
+    );
+  }
+
+  //  Usar isAuthenticated en lugar de solo user
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (roles && !hasRole(roles)) {
-    return <Navigate to="/" replace />;
+  //  Verificar roles correctamente
+  if (roles && roles.length > 0) {
+    const roleList = Array.isArray(roles) ? roles : [roles];
+    if (!roleList.includes(user?.rol)) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return children;

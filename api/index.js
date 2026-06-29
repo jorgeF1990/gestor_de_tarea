@@ -1,4 +1,29 @@
 // api/index.js
+// Cargar variables de entorno desde .env
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Buscar .env en la raíz del proyecto
+const envPath = path.join(__dirname, '..', '.env');
+console.log('[VERCEL] Cargando .env desde:', envPath);
+
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error('[VERCEL] Error cargando .env:', result.error.message);
+  // Intentar desde la raíz actual
+  const fallbackPath = path.join(__dirname, '.env');
+  console.log('[VERCEL] Intentando desde:', fallbackPath);
+  const fallback = dotenv.config({ path: fallbackPath });
+  if (fallback.error) {
+    console.error('[VERCEL] No se pudo cargar .env desde ninguna ubicacion');
+  }
+} else {
+  console.log('[VERCEL] Variables de entorno cargadas correctamente');
+  console.log('[VERCEL] MONGODB_URI:', process.env.MONGODB_URI ? 'Definida' : 'No definida');
+  console.log('[VERCEL] JWT_SECRET:', process.env.JWT_SECRET ? 'Definida' : 'No definida');
+}
+
 console.log('[VERCEL] Iniciando funcion serverless');
 
 const express = require('express');
@@ -52,8 +77,6 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200
 }));
-
-
 
 // ============================================================
 // MONGODB CONNECTION (CACHED)

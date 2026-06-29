@@ -35,6 +35,18 @@
       "dest": "api/index.js"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "frontend-react/dist/assets/$1"
+    },
+    {
+      "src": "/favicon.svg",
+      "dest": "frontend-react/dist/favicon.svg"
+    },
+    {
+      "src": "/logo.svg",
+      "dest": "frontend-react/dist/logo.svg"
+    },
+    {
       "src": "/",
       "dest": "frontend-react/dist/index.html"
     },

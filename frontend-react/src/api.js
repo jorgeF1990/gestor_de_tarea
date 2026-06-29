@@ -2,11 +2,9 @@ import axios from 'axios';
 
 // Configuración unificada de API
 const getBaseURL = () => {
-  // En producción usar la URL de Vercel
   if (import.meta.env.PROD) {
     return import.meta.env.VITE_API_URL || 'https://tareasync.vercel.app';
   }
-  // En desarrollo usar el proxy de Vite
   return import.meta.env.VITE_API_URL || '';
 };
 
@@ -30,13 +28,14 @@ API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     
+    console.log('[API] Interceptor - Token presente:', !!token);
+    console.log('[API] Interceptor - URL:', config.url);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // Log en desarrollo
-    if (import.meta.env.DEV) {
-      console.log('[API Request]', config.method.toUpperCase(), config.url);
+      console.log('[API] Interceptor - Token añadido al header');
+    } else {
+      console.warn('[API] Interceptor - No se encontró token');
     }
     
     return config;
@@ -58,7 +57,6 @@ API.interceptors.response.use(
     
     console.error('[API Error]', status, data?.message || error.message);
     
-    // Manejo de 401 - Token expirado
     if (status === 401) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');

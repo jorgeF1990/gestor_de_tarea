@@ -2,15 +2,17 @@ import axios from 'axios';
 
 // Configuración unificada de API
 const getBaseURL = () => {
-  if (import.meta.env.PROD) {
-    return import.meta.env.VITE_API_URL || 'https://tareasync.vercel.app';
+  // En producción usar la URL de Vercel
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.VITE_API_URL || 'https://tareasync.vercel.app';
   }
-  return import.meta.env.VITE_API_URL || '';
+  // En desarrollo usar el proxy de Vite
+  return process.env.VITE_API_URL || '';
 };
 
 const API_BASE_URL = getBaseURL();
 
-console.log('[API] Environment:', import.meta.env.MODE);
+console.log('[API] Environment:', process.env.NODE_ENV || 'development');
 console.log('[API] Base URL:', API_BASE_URL);
 
 const API = axios.create({
@@ -46,7 +48,7 @@ API.interceptors.request.use(
 // Interceptor de Response - Manejo de errores
 API.interceptors.response.use(
   (response) => {
-    if (import.meta.env.DEV) {
+    if (process.env.NODE_ENV === 'development') {
       console.log('[API Response]', response.status, response.config.url);
     }
     return response;

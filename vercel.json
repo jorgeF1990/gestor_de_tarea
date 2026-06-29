@@ -37,16 +37,15 @@
       "dest": "api/index.js"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "frontend-react/dist/assets/$1"
-    },
-    {
       "src": "/favicon.svg",
       "dest": "frontend-react/dist/favicon.svg"
     },
     {
       "src": "/logo.svg",
       "dest": "frontend-react/dist/logo.svg"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/",
@@ -79,10 +78,6 @@
     {
       "src": "/tareas/(.*)",
       "dest": "frontend-react/dist/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend-react/dist/$1"
     }
   ],
   "env": {

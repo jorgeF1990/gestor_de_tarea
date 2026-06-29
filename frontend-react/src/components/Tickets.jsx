@@ -1,7 +1,7 @@
 // frontend-react/src/components/Tickets.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API from '../api';
+import API, { getTickets } from '../api';
 import './Tickets.css';
 import SilenciarNotificaciones from '../components/SilenciarNotificaciones';
 import CalendarView from './CalendarView';
@@ -180,36 +180,41 @@ export default function Tickets() {
 
     if (!silent) setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (fEstado) params.append('estado', fEstado);
-      if (fPrio) params.append('prioridad', fPrio);
+      const params = {};
+      if (fEstado) params.estado = fEstado;
+      if (fPrio) params.prioridad = fPrio;
 
-      const response = await API.get(`/tickets?${params.toString()}`);
+      const data = await getTickets(params);
+      
+      if (Array.isArray(data)) {
+        const ordered = data.slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
+        setTickets(ordered);
 
-      const data = response;
-      const ordered = (data || []).slice().sort((a, b) => getActivityTs(b) - getActivityTs(a));
+        const prev = getSeen();
+        const curr = buildSnap(ordered);
+        const newChanges = {};
+        let changesCount = 0;
 
-      const prev = getSeen();
-      const curr = buildSnap(ordered);
-      const newChanges = {};
-      let changesCount = 0;
-
-      for (const t of ordered) {
-        const diff = computeChanges(prev, curr, t);
-        const anyChange = diff.nuevo || diff.comentario || diff.estado || diff.prioridad;
-        if (anyChange) {
-          newChanges[t._id] = diff;
-          changesCount++;
+        for (const t of ordered) {
+          const diff = computeChanges(prev, curr, t);
+          const anyChange = diff.nuevo || diff.comentario || diff.estado || diff.prioridad;
+          if (anyChange) {
+            newChanges[t._id] = diff;
+            changesCount++;
+          }
         }
-      }
 
-      if (changesCount > 0 && silent) {
-        setNewsCount(changesCount);
-        showToast(`${changesCount} ticket(s) con novedades`);
-      }
+        if (changesCount > 0 && silent) {
+          setNewsCount(changesCount);
+          showToast(`${changesCount} ticket(s) con novedades`);
+        }
 
-      setChangesMap(newChanges);
-      setTickets(ordered);
+        setChangesMap(newChanges);
+      } else {
+        console.error('[Tickets] La respuesta no es un array:', data);
+        setTickets([]);
+        setChangesMap({});
+      }
     } catch (error) {
       console.error('Error cargando tickets:', error);
       if (error.response?.status === 401 || error.response?.status === 403) {
@@ -420,7 +425,7 @@ export default function Tickets() {
           <div className="empty">
             <Lock size={32} />
             <h3>No autenticado</h3>
-            <p>Por favor, inicia sesión para ver tus tickets.</p>
+            <p>Por favor, inicia sesion para ver tus tickets.</p>
             <button 
               className="tks-btn" 
               onClick={() => navigate('/login')}

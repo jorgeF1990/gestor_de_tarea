@@ -14,7 +14,10 @@ export default function ProtectedRoute({ roles, children }) {
   const { user, isAuthenticated, loading } = useContext(AuthContext);
   const location = useLocation();
 
-  //  Esperar a que termine la carga del token
+  // Log para depurar
+  console.log('[ProtectedRoute] loading:', loading, 'isAuthenticated:', isAuthenticated);
+
+  // Esperar a que termine la carga del token
   if (loading) {
     return (
       <div style={{
@@ -31,12 +34,12 @@ export default function ProtectedRoute({ roles, children }) {
     );
   }
 
-  //  Usar isAuthenticated en lugar de solo user
+  // Si no está autenticado, redirigir a login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  //  Verificar roles correctamente
+  // Verificar roles si se especificaron
   if (roles && roles.length > 0) {
     const roleList = Array.isArray(roles) ? roles : [roles];
     if (!roleList.includes(user?.rol)) {
